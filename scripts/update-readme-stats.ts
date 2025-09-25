@@ -138,16 +138,25 @@ class ReadmeStatsUpdater {
       fileSize = this.formatFileSize(sizeBytes);
     }
 
+    // Check if report.md exists in data folder
+    const reportPath = "data/report.md";
+    const hasReport = existsSync(reportPath);
+
     // Calculate repository performance
     const repoStats = Object.values(stats.repositoryStats);
     const avgDownloadTime =
       repoStats.reduce((sum, repo) => sum + repo.downloadTime, 0) / repoStats.length;
     const totalDataSize = repoStats.reduce((sum, repo) => sum + repo.fileSize, 0);
 
+    // Build the report link section
+    const reportSection = hasReport
+      ? `\n> 📋 **[View Detailed Report](${reportPath})** | Last sync analysis and insights`
+      : "";
+
     return `
 ## 📊 Current Statistics
 
-> **Last Updated**: ${lastUpdate} | **Next Sync**: Automated twice daily (6 AM & 6 PM UTC)
+> **Last Updated**: ${lastUpdate} | **Next Sync**: Automated twice daily (6 AM & 6 PM UTC)${reportSection}
 
 <div align="center">
 

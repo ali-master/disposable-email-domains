@@ -1,6 +1,62 @@
 # Disposable Email Domains - TypeScript SDK & CLI
 
+<!-- STATS -->
+## 📊 Current Statistics
+
+> **Last Updated**: September 25, 2025 at 02:46 PM GMT+3:30 | **Next Sync**: Automated twice daily (6 AM & 6 PM UTC)
+> 📋 **[View Detailed Report](data/report.md)** | Last sync analysis and insights
+
 <div align="center">
+
+### 🎯 Domain Coverage
+
+| 📧 **Total Domains** | 🆕 **Recent Additions** | 🗑️ **Recent Removals** | 📈 **Growth Rate** |
+|:---:|:---:|:---:|:---:|
+| **119,617** | **0** | **0** | **0.00%** |
+
+### ⚡ Performance Metrics
+
+| 🚀 **Sync Time** | ✅ **Success Rate** | 📦 **File Size** | 🔄 **Deduplication** |
+|:---:|:---:|:---:|:---:|
+| **0.93s** | **100.0%** | **1.8 MB** | **164,496 removed** |
+
+</div>
+
+### 🏆 Top Contributing Sources
+
+| Repository | Domains | Success | Performance |
+|------------|---------|---------|-------------|
+| [kslr/disposable-email-domains](https://github.com/kslr/disposable-email-domains) | 110,498 | ✅ | 0.32s (1.6 MB) |
+| [FGRibreau/mailchecker](https://github.com/FGRibreau/mailchecker) | 55,857 | ✅ | 0.30s (838.3 KB) |
+| [wesbos/burner-email-providers](https://github.com/wesbos/burner-email-providers) | 27,284 | ✅ | 0.23s (388.1 KB) |
+| [groundcat/disposable-email-domain-list](https://github.com/groundcat/disposable-email-domain-list) | 27,120 | ✅ | 0.17s (401.7 KB) |
+| [disposable/disposable-email-domains](https://github.com/disposable/disposable-email-domains) | 27,038 | ✅ | 0.16s (381.4 KB) |
+| [sublime-security/static-files](https://github.com/sublime-security/static-files) | 10,523 | ✅ | 0.18s (144.0 KB) |
+| [7c/fakefilter](https://github.com/7c/fakefilter) | 8,784 | ✅ | 0.11s (126.7 KB) |
+| [disposable-email-domains/disposable-email-domains](https://github.com/disposable-email-domains/disposable-email-domains) | 4,725 | ✅ | 0.08s (59.7 KB) |
+| [willwhite/freemail](https://github.com/willwhite/freemail) | 4,462 | ✅ | 0.06s (61.8 KB) |
+| [eser/sanitizer-svc](https://github.com/eser/sanitizer-svc) | 3,855 | ✅ | 0.14s (48.9 KB) |
+
+<details>
+<summary>📈 <strong>Detailed Metrics</strong></summary>
+
+#### 🔍 Sync Analysis
+- **Total Sources**: 15 repositories monitored
+- **Active Sources**: 15 successfully synchronized
+- **Failed Sources**: 0 temporary failures
+- **Processing Efficiency**: 129176 domains/second
+- **Average Download Time**: 0.15s per repository
+- **Total Data Processed**: 4.1 MB
+
+#### 🎯 Quality Metrics
+- **Duplicate Detection**: 164,496 duplicates identified and removed
+- **Data Integrity**: 100.0% repository success rate
+- **Coverage Efficiency**: 42.1% unique domains retained
+
+</details>
+
+---
+<!-- END STATS --><div align="center">
   <img src="assets/logo.svg" alt="Disposable Email Domains Logo" width="120" height="120">
   
   <p><strong>A powerful TypeScript SDK and CLI for detecting disposable email addresses with real-time synchronization and DNS validation</strong></p>
@@ -616,48 +672,7 @@ npx disposable-email-domains check user@example.com --dns-servers 1.1.1.1,8.8.8.
 
 We maintain an up-to-date database by synchronizing with 8+ trusted sources:
 
-<!-- STATS -->
-## 📊 Current Statistics
 
-> **Last Updated**: September 25, 2025 at 02:15 PM GMT+3:30 | **Next Sync**: Automated twice daily (6 AM & 6 PM UTC)
-
-<div align="center">
-
-### 🎯 Domain Coverage
-
-| 📧 **Total Domains** | 🆕 **Recent Additions** | 🗑️ **Recent Removals** | 📈 **Growth Rate** |
-|:---:|:---:|:---:|:---:|
-| **79,502** | **79,502** | **0** | **+100.00%** |
-
-### ⚡ Performance Metrics
-
-| 🚀 **Sync Time** | ✅ **Success Rate** | 📦 **File Size** | 🔄 **Deduplication** |
-|:---:|:---:|:---:|:---:|
-| **1.35s** | **100.0%** | **1.2 MB** | **57,429 removed** |
-
-### 🌐 DNS Validation Stats
-
-| 🔍 **DNS Queries/Day** | ⚡ **Avg Response Time** | 💾 **Cache Hit Rate** | 🔧 **Connectivity Tests** |
-|:---:|:---:|:---:|:---:|
-| **~50K** | **<150ms** | **>90%** | **~5K/day** |
-
-</div>
-
-### 🏆 Top Contributing Sources
-
-| Repository | Domains | Success | Performance |
-|------------|---------|---------|-------------|
-| [FGRibreau/mailchecker](https://github.com/FGRibreau/mailchecker) | 55,857 | ✅ | 0.71s (838.3 KB) |
-| [wesbos/burner-email-providers](https://github.com/wesbos/burner-email-providers) | 27,284 | ✅ | 1.04s (388.1 KB) |
-| [disposable/disposable-email-domains](https://github.com/disposable/disposable-email-domains) | 27,102 | ✅ | 1.02s (382.4 KB) |
-| [sublime-security/static-files](https://github.com/sublime-security/static-files) | 10,523 | ✅ | 0.66s (144.0 KB) |
-| [7c/fakefilter](https://github.com/7c/fakefilter) | 8,780 | ✅ | 0.77s (126.7 KB) |
-| [disposable-email-domains/disposable-email-domains](https://github.com/disposable-email-domains/disposable-email-domains) | 4,725 | ✅ | 0.59s (59.7 KB) |
-| [willwhite/freemail](https://github.com/willwhite/freemail) | 4,462 | ✅ | 0.33s (61.8 KB) |
-| [MattKetmo/EmailChecker](https://github.com/MattKetmo/EmailChecker) | 2,515 | ✅ | 0.29s (32.4 KB) |
-
----
-<!-- END STATS -->
 
 For advanced synchronization features and custom source management, see our [Syncer Documentation](./docs/syncer.md).
 
