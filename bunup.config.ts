@@ -6,23 +6,10 @@ import { shims, exports } from "bunup/plugins";
  */
 const config = defineConfig([
   {
-    entry: ["src/syncer/index.ts"],
-    format: ["esm"],
-    outDir: "./dist/syncer",
-    target: "bun",
-    dts: true,
-    plugins: [shims(), exports()],
-    clean: true,
-    minify: true,
-    minifyWhitespace: true,
-    minifyIdentifiers: true,
-    minifySyntax: true,
-  },
-  {
     entry: ["src/client/index.ts"],
     format: ["esm"],
     outDir: "./dist/client",
-    target: "bun",
+    target: "node",
     dts: true,
     plugins: [shims(), exports()],
     clean: true,

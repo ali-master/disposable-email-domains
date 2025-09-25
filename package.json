@@ -6,8 +6,7 @@
   "files": [
     "dist",
     "./dist",
-    "./dist/client",
-    "./dist/syncer"
+    "./dist/client"
   ],
   "module": "./dist/client/index.js",
   "types": "./dist/client/index.d.ts",
