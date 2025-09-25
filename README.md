@@ -667,47 +667,18 @@ We maintain test coverage with 50+ test cases targeting 80%+ coverage:
 
 ```bash
 # Run all tests
-bun test
+bun run test
 
 # Run with coverage
-bun test --coverage
-
-# Run DNS-specific tests
-bun test dns
+bun run test:coverage
 
 # Run benchmarks
-bun run benchmark
+bun run test:bench
 ```
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guide](./CONTRIBUTING.md) for details.
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes with tests
-4. Run the test suite (`bun test`)
-5. Commit your changes (`git commit -m 'Add amazing feature'`)
-6. Push to the branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
 
 ## 📄 License
 
 MIT © [Ali Torki](https://github.com/ali-master)
-
-## 🔗 Related Projects
-
-- [Domain Synchronization Manager](./docs/syncer.md) - Advanced domain list management
-- [DNS Resolver](./src/client/dns-resolver.ts) - DNS validation system
-- [CLI Tools](./docs/cli.md) - Command-line interface documentation
-- [Cache Adapters](./examples/cache/) - Custom cache implementation examples
-
-## 📞 Support
-
-- 📖 [Documentation](./docs/)
-- 🐛 [Issue Tracker](https://github.com/ali-master/disposable-email-domains/issues)
-- 💬 [Discussions](https://github.com/ali-master/disposable-email-domains/discussions)
-- 📧 [Email Support](mailto:ali@usex.dev)
 
 ---
 
