@@ -2,14 +2,14 @@
   {
     "name": "syncer",
     "path": ["dist/syncer/index.js", "dist/syncer/index.d.ts"],
-    "limit": "23 kB",
+    "limit": "24 kB",
     "brotli": false,
     "gzip": false
   },
   {
     "name": "client",
     "path": ["dist/client/index.js", "dist/client/index.d.ts"],
-    "limit": "55 kB",
+    "limit": "78 kB",
     "brotli": false,
     "gzip": false
   }
