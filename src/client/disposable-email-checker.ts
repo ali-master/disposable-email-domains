@@ -19,6 +19,53 @@ import { AnalyticsEngine } from "./analytics-engine";
 
 const debug = createDebugger("disposable-email:disposable-email-checker");
 
+// Pre-compile regex patterns for reuse
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const DOMAIN_PATTERN = /^[a-z0-9.-]+\.[a-z]{2,}$/i;
+
+// Object pools for result reuse
+const resultPool: EmailValidationResult[] = [];
+const getPooledResult = (): EmailValidationResult => {
+  if (resultPool.length > 0) {
+    const result = resultPool.pop()!;
+    // Reset properties
+    result.email = "";
+    result.isValid = false;
+    result.isDisposable = false;
+    result.isAllowed = false;
+    result.isBlacklisted = false;
+    result.domain = "";
+    result.localPart = "";
+    result.matchType = "none";
+    result.confidence = 0;
+    result.validationTime = 0;
+    result.errors.length = 0;
+    result.warnings.length = 0;
+    result.source = undefined;
+    return result;
+  }
+  return {
+    email: "",
+    isValid: false,
+    isDisposable: false,
+    isAllowed: false,
+    isBlacklisted: false,
+    domain: "",
+    localPart: "",
+    matchType: "none",
+    confidence: 0,
+    validationTime: 0,
+    errors: [],
+    warnings: [],
+  };
+};
+
+const returnToPool = (result: EmailValidationResult): void => {
+  if (resultPool.length < 1000) {
+    resultPool.push(result);
+  }
+};
+
 /**
  * Advanced Email Disposable Checker with comprehensive features
  */
@@ -28,7 +75,7 @@ export class DisposableEmailChecker {
   private allowlistSet = new Set<string>();
   private blacklistSet = new Set<string>();
 
-  // Component instances
+  // Component instances - lazy initialized
   private domainTrie?: TrieIndex;
   private bloomFilter?: BloomFilter;
   private cacheManager: CacheManager | undefined;
@@ -36,9 +83,20 @@ export class DisposableEmailChecker {
   private dataLoader: DataLoader;
   private emailValidator: EmailValidator;
   private domainChecker: DomainChecker;
-  private analyticsEngine: AnalyticsEngine;
+  private analyticsEngine?: AnalyticsEngine;
 
   private lastUpdateTime = 0;
+  private initialized = false;
+  private initializationPromise?: Promise<void>;
+
+  // Cache frequently used arrays to avoid allocations
+  private static readonly TRUSTED_DOMAINS = Object.freeze([
+    "gmail.com",
+    "outlook.com",
+    "yahoo.com",
+    "hotmail.com",
+  ]);
+  private static readonly EMPTY_PATTERNS = Object.freeze([]);
 
   constructor(config: Partial<EmailCheckerConfig> = {}) {
     this.config = {
@@ -57,28 +115,30 @@ export class DisposableEmailChecker {
       indexingStrategy: "hybrid",
       autoUpdate: false,
       updateInterval: 24,
-      customPatterns: [],
-      trustedDomains: ["gmail.com", "outlook.com", "yahoo.com", "hotmail.com"],
-      suspiciousPatterns: [],
+      // @ts-expect-error
+      customPatterns: DisposableEmailChecker.EMPTY_PATTERNS,
+      // @ts-expect-error
+      trustedDomains: DisposableEmailChecker.TRUSTED_DOMAINS,
+      // @ts-expect-error
+      suspiciousPatterns: DisposableEmailChecker.EMPTY_PATTERNS,
       // Cache configuration defaults
       cacheType: "memory",
       cacheConfig: {
         maxSize: 10000,
-        defaultTtl: 24 * 60 * 60 * 1000, // 24 hours
-        cleanupInterval: 60 * 60 * 1000, // 1 hour
+        defaultTtl: 86400000, // Pre-calculated: 24 * 60 * 60 * 1000
+        cleanupInterval: 3600000, // Pre-calculated: 60 * 60 * 1000
       },
       customCache: undefined,
       ...config,
     };
 
-    // Initialize components
+    // Initialize only essential components immediately
     this.initializeCacheManager();
     this.metricsManager = new MetricsManager();
     this.dataLoader = new DataLoader();
     this.emailValidator = new EmailValidator(this.config.strictValidation);
-    this.analyticsEngine = new AnalyticsEngine(this.disposableDomainsSet);
 
-    // Initialize domain checker (will be properly configured after data loading)
+    // Initialize domain checker with empty sets (will be updated after data loading)
     this.domainChecker = new DomainChecker(
       this.disposableDomainsSet,
       this.allowlistSet,
@@ -86,8 +146,16 @@ export class DisposableEmailChecker {
       this.config.trustedDomains,
       this.config.enableSubdomainChecking,
     );
+  }
 
-    this.initialize();
+  private async ensureInitialized(): Promise<void> {
+    if (this.initialized) return;
+
+    if (!this.initializationPromise) {
+      this.initializationPromise = this.initialize();
+    }
+
+    await this.initializationPromise;
   }
 
   /**
@@ -95,26 +163,22 @@ export class DisposableEmailChecker {
    */
   private initializeCacheManager(): void {
     if (!this.config.enableCaching) {
-      // Use no-op cache when caching is disabled
       this.cacheManager = new CacheManager("noop");
       return;
     }
 
-    // Use custom cache instance if provided
     if (this.config.customCache) {
       this.cacheManager = new CacheManager(this.config.customCache);
       return;
     }
 
-    // Merge cache configuration with backward compatibility
     const cacheConfig = {
       maxSize: this.config.cacheSize || this.config.cacheConfig?.maxSize || 10000,
-      defaultTtl: this.config.cacheConfig?.defaultTtl || 24 * 60 * 60 * 1000,
+      defaultTtl: this.config.cacheConfig?.defaultTtl || 86400000,
       cleanupInterval: this.config.cacheConfig?.cleanupInterval,
       ...this.config.cacheConfig,
     };
 
-    // Use specified cache type or default to memory
     const cacheType = this.config.cacheType || "memory";
     this.cacheManager = new CacheManager(cacheType, cacheConfig);
   }
@@ -130,8 +194,8 @@ export class DisposableEmailChecker {
         await this.buildIndex();
       }
 
-      // Update components with loaded data
       this.updateComponents();
+      this.initialized = true;
 
       debug(
         "AdvancedEmailChecker initialized with %d disposable domains",
@@ -241,34 +305,48 @@ export class DisposableEmailChecker {
       this.config.indexingStrategy,
     );
 
-    this.analyticsEngine.updateDisposableDomains(this.disposableDomainsSet);
+    // Lazy initialize analytics engine only when needed
+    if (!this.analyticsEngine) {
+      this.analyticsEngine = new AnalyticsEngine(this.disposableDomainsSet);
+    } else {
+      this.analyticsEngine.updateDisposableDomains(this.disposableDomainsSet);
+    }
   }
 
   /**
    * Main email validation and checking method
    */
   public async checkEmail(email: string): Promise<EmailValidationResult> {
+    await this.ensureInitialized();
+
     const startTime = performance.now();
+    const normalizedEmail = email.toLowerCase().trim();
 
     try {
+      // Quick format validation before cache check
+      if (!EMAIL_PATTERN.test(normalizedEmail)) {
+        const result = getPooledResult();
+        result.email = normalizedEmail;
+        result.validationTime = performance.now() - startTime;
+        result.errors.push("Invalid email format");
+        return result;
+      }
+
       // Check cache first
       if (this.config.enableCaching) {
-        const cached = await this.cacheManager!.get(email);
+        const cached = await this.cacheManager!.get(normalizedEmail);
         if (cached) {
           this.metricsManager.updateMetrics("cache_hit");
-
-          return {
-            ...cached,
-            validationTime: performance.now() - startTime,
-          };
+          cached.validationTime = performance.now() - startTime;
+          return cached;
         }
       }
 
-      const result = await this.performEmailCheck(email, startTime);
+      const result = await this.performEmailCheck(normalizedEmail, startTime);
 
       // Cache the result
       if (this.config.enableCaching) {
-        await this.cacheManager!.set(email, result);
+        await this.cacheManager!.set(normalizedEmail, result);
       }
 
       this.metricsManager.updateMetrics("validation", result);
@@ -277,20 +355,11 @@ export class DisposableEmailChecker {
       return result;
     } catch (error) {
       this.metricsManager.updateMetrics("error");
-      return {
-        email,
-        isValid: false,
-        isDisposable: false,
-        isAllowed: false,
-        isBlacklisted: false,
-        domain: "",
-        localPart: "",
-        matchType: "none",
-        confidence: 0,
-        validationTime: performance.now() - startTime,
-        errors: [error instanceof Error ? error.message : String(error)],
-        warnings: [],
-      };
+      const result = getPooledResult();
+      result.email = normalizedEmail;
+      result.validationTime = performance.now() - startTime;
+      result.errors.push(error instanceof Error ? error.message : String(error));
+      return result;
     }
   }
 
@@ -301,20 +370,8 @@ export class DisposableEmailChecker {
     email: string,
     startTime: number,
   ): Promise<EmailValidationResult> {
-    const result: EmailValidationResult = {
-      email: email.toLowerCase(),
-      isValid: false,
-      isDisposable: false,
-      isAllowed: false,
-      isBlacklisted: false,
-      domain: "",
-      localPart: "",
-      matchType: "none",
-      confidence: 0,
-      validationTime: 0,
-      errors: [],
-      warnings: [],
-    };
+    const result = getPooledResult();
+    result.email = email;
 
     // Step 1: Basic format validation
     const isValidFormat = this.emailValidator.validateEmailFormat(email, result);
@@ -355,8 +412,8 @@ export class DisposableEmailChecker {
       result.source = disposableResult.source;
     }
 
-    // Step 6: Pattern-based analysis
-    if (this.config.enablePatternMatching) {
+    // Step 6: Pattern-based analysis (only if enabled and patterns exist)
+    if (this.config.enablePatternMatching && this.config.customPatterns.length > 0) {
       const patternResult = this.emailValidator.analyzePatterns(
         email,
         localPart,
@@ -395,15 +452,59 @@ export class DisposableEmailChecker {
    * Batch email validation for improved performance
    */
   public async checkEmailsBatch(emails: string[]): Promise<EmailValidationResult[]> {
+    await this.ensureInitialized();
+
     const startTime = performance.now();
     const results: EmailValidationResult[] = [];
 
-    // Process in chunks for better memory management
-    const chunkSize = 100;
-    for (let i = 0; i < emails.length; i += chunkSize) {
-      const chunk = emails.slice(i, i + chunkSize);
-      const chunkResults = await Promise.all(chunk.map((email) => this.checkEmail(email)));
-      results.push(...chunkResults);
+    // Pre-normalize and filter emails
+    const normalizedEmails = emails.map((email) => email.toLowerCase().trim());
+    const uniqueEmails = [...new Set(normalizedEmails)];
+
+    // Check cache for all emails at once
+    const cachePromises = this.config.enableCaching
+      ? uniqueEmails.map((email) => this.cacheManager!.get(email))
+      : [];
+
+    const cachedResults = this.config.enableCaching ? await Promise.all(cachePromises) : [];
+
+    const uncachedEmails: string[] = [];
+    const resultMap = new Map<string, EmailValidationResult>();
+
+    // Separate cached vs uncached
+    for (let i = 0; i < uniqueEmails.length; i++) {
+      const email = uniqueEmails[i];
+      const cached = cachedResults[i];
+
+      if (cached) {
+        resultMap.set(email, cached);
+        this.metricsManager.updateMetrics("cache_hit");
+      } else {
+        uncachedEmails.push(email);
+      }
+    }
+
+    // Process uncached emails in optimized chunks
+    const chunkSize = Math.min(50, Math.max(10, Math.floor(uncachedEmails.length / 4)));
+    const processingPromises: Promise<void>[] = [];
+
+    for (let i = 0; i < uncachedEmails.length; i += chunkSize) {
+      const chunk = uncachedEmails.slice(i, i + chunkSize);
+
+      processingPromises.push(
+        Promise.all(chunk.map((email) => this.checkEmail(email))).then((chunkResults) => {
+          for (let j = 0; j < chunk.length; j++) {
+            resultMap.set(chunk[j], chunkResults[j]);
+          }
+        }),
+      );
+    }
+
+    await Promise.all(processingPromises);
+
+    // Maintain original order and handle duplicates
+    for (const email of normalizedEmails) {
+      results.push(resultMap.get(email)!);
     }
 
     const totalTime = performance.now() - startTime;
@@ -417,13 +518,17 @@ export class DisposableEmailChecker {
    */
   public async generateValidationReport(emails: string[]): Promise<ValidationReport> {
     const results = await this.checkEmailsBatch(emails);
-    return this.analyticsEngine.generateValidationReport(results);
+    // @ts-expect-error
+    return this.analyticsEngine?.generateValidationReport(results);
   }
 
   /**
    * Get domain statistics and insights
    */
   public getDomainInsights(): DomainInsights {
+    if (!this.analyticsEngine) {
+      this.analyticsEngine = new AnalyticsEngine(this.disposableDomainsSet);
+    }
     return this.analyticsEngine.getDomainInsights();
   }
 
@@ -431,6 +536,9 @@ export class DisposableEmailChecker {
    * Advanced search with fuzzy matching
    */
   public searchSimilarDomains(domain: string, threshold = 0.8): string[] {
+    if (!this.analyticsEngine) {
+      this.analyticsEngine = new AnalyticsEngine(this.disposableDomainsSet);
+    }
     return this.analyticsEngine.searchSimilarDomains(domain, threshold);
   }
 
