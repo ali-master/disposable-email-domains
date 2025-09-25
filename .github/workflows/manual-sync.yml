@@ -1,0 +1,555 @@
+name: 🔧 Manual Sync & Maintenance
+
+on:
+  workflow_dispatch:
+    inputs:
+      sync_type:
+        type: choice
+        description: 'Type of sync to perform'
+        required: true
+        default: 'full'
+        options:
+          - 'full'
+          - 'quick'
+          - 'verify-only'
+          - 'repair'
+      target_repositories:
+        type: string
+        description: 'Comma-separated list of repository URLs to sync (empty = all)'
+        required: false
+        default: ''
+      custom_config:
+        type: string
+        description: 'Path to custom repository configuration file'
+        required: false
+        default: 'configs/repositories.yaml'
+      output_format:
+        type: choice
+        description: 'Output format preference'
+        required: false
+        default: 'both'
+        options:
+          - 'both'
+          - 'txt-only'
+          - 'json-only'
+      notification_level:
+        type: choice
+        description: 'Notification detail level'
+        required: false
+        default: 'normal'
+        options:
+          - 'minimal'
+          - 'normal'
+          - 'detailed'
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: manual-sync-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  FORCE_COLOR: 3
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: write
+
+jobs:
+  # ========================================
+  # TRIGGER VALIDATION
+  # ========================================
+  validate_trigger:
+    name: 🔍 Validate Trigger
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.check.outputs.should_run }}
+      sync_type: ${{ steps.check.outputs.sync_type }}
+      trigger_type: ${{ steps.check.outputs.trigger_type }}
+      issue_number: ${{ steps.check.outputs.issue_number }}
+
+    steps:
+      - name: 🔍 Check Trigger Conditions
+        id: check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const eventName = context.eventName;
+            
+            if (eventName === 'workflow_dispatch') {
+              console.log('✅ Manual workflow dispatch trigger');
+              core.setOutput('should_run', 'true');
+              core.setOutput('sync_type', '${{ github.event.inputs.sync_type }}');
+              core.setOutput('trigger_type', 'manual');
+              return;
+            }
+            
+            if (eventName === 'issue_comment') {
+              const comment = context.payload.comment.body;
+              const author = context.payload.comment.user.login;
+              const issueNumber = context.payload.issue.number;
+              
+              // Check if comment contains sync command
+              const syncCommands = [
+                '/sync',
+                '/sync-domains',
+                '/update-domains',
+                '/refresh-domains'
+              ];
+              
+              const hasSyncCommand = syncCommands.some(cmd => 
+                comment.toLowerCase().includes(cmd)
+              );
+              
+              if (!hasSyncCommand) {
+                console.log('ℹ️ Comment does not contain sync command');
+                core.setOutput('should_run', 'false');
+                return;
+              }
+              
+              // Check if author has permissions (collaborator, owner, or member)
+              try {
+                const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  username: author
+                });
+                
+                const hasPermission = ['admin', 'write', 'maintain'].includes(permission.permission);
+                
+                if (!hasPermission) {
+                  console.log(`❌ User ${author} does not have sufficient permissions`);
+                  
+                  await github.rest.issues.createComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issueNumber,
+                    body: `❌ @${author} You don't have sufficient permissions to trigger domain sync. Required permissions: write, maintain, or admin.`
+                  });
+                  
+                  core.setOutput('should_run', 'false');
+                  return;
+                }
+                
+                console.log(`✅ User ${author} has sufficient permissions`);
+                core.setOutput('should_run', 'true');
+                core.setOutput('sync_type', 'full');
+                core.setOutput('trigger_type', 'comment');
+                core.setOutput('issue_number', issueNumber);
+                
+                // Add reaction to acknowledge command
+                await github.rest.reactions.createForIssueComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: context.payload.comment.id,
+                  content: 'rocket'
+                });
+                
+              } catch (error) {
+                console.log(`❌ Error checking permissions: ${error.message}`);
+                core.setOutput('should_run', 'false');
+              }
+            }
+
+  # ========================================
+  # MANUAL SYNC EXECUTION
+  # ========================================
+  manual_sync:
+    name: 🔄 Manual Domain Sync
+    runs-on: ubuntu-latest
+    needs: validate_trigger
+    if: needs.validate_trigger.outputs.should_run == 'true'
+    timeout-minutes: 45
+
+    outputs:
+      sync_success: ${{ steps.execute_sync.outputs.success }}
+      domains_count: ${{ steps.parse_results.outputs.domains_count }}
+      new_domains: ${{ steps.parse_results.outputs.new_domains }}
+      removed_domains: ${{ steps.parse_results.outputs.removed_domains }}
+      processing_time: ${{ steps.parse_results.outputs.processing_time }}
+      success_rate: ${{ steps.parse_results.outputs.success_rate }}
+      report_path: ${{ steps.generate_report.outputs.report_path }}
+
+    steps:
+      - name: 🚀 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🏗️ Setup Bun Runtime
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: 📦 Install Dependencies
+        run: |
+          bun install --frozen-lockfile
+          echo "✅ Dependencies installed"
+
+      - name: 📋 Notify Start
+        if: needs.validate_trigger.outputs.trigger_type == 'comment'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issueNumber = ${{ needs.validate_trigger.outputs.issue_number }};
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: `🚀 **Manual Domain Sync Started**
+              
+              **Sync Type**: ${{ needs.validate_trigger.outputs.sync_type }}
+              **Triggered by**: @${{ github.actor }}
+              **Workflow Run**: [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+              
+              ⏳ Sync in progress... This may take a few minutes.`
+            });
+
+      - name: 📊 Pre-Sync Backup
+        run: |
+          mkdir -p backup/manual-sync
+          timestamp=$(date +"%Y%m%d-%H%M%S")
+          
+          if [ -f "data/domains.json" ]; then
+            cp data/domains.json "backup/manual-sync/domains-${timestamp}.json"
+            echo "✅ Backed up domains.json"
+          fi
+          
+          if [ -f "data/stats.json" ]; then
+            cp data/stats.json "backup/manual-sync/stats-${timestamp}.json"
+            echo "✅ Backed up stats.json"
+          fi
+
+      - name: 🔄 Execute Sync
+        id: execute_sync
+        run: |
+          echo "🚀 Starting manual domain sync..."
+          echo "Sync type: ${{ needs.validate_trigger.outputs.sync_type }}"
+          
+          # Build sync command based on type
+          case "${{ needs.validate_trigger.outputs.sync_type }}" in
+            "quick")
+              sync_args="--concurrency 3 --timeout 20000 --no-backup"
+              ;;
+            "verify-only")
+              sync_args="--concurrency 1 --timeout 10000 --no-stats"
+              ;;
+            "repair")
+              sync_args="--concurrency 1 --timeout 60000 --retries 5"
+              ;;
+            *)
+              sync_args="--verbose --timeout 45000 --concurrency 8 --retries 3"
+              ;;
+          esac
+          
+          # Add custom config if specified
+          if [ -n "${{ github.event.inputs.custom_config }}" ]; then
+            config_path="${{ github.event.inputs.custom_config }}"
+          else
+            config_path="configs/repositories.yaml"
+          fi
+          
+          echo "📋 Using configuration: $config_path"
+          echo "🔧 Sync arguments: $sync_args"
+          
+          # Execute the sync
+          if bun run src/cli.ts --config "$config_path" $sync_args; then
+            echo "success=true" >> $GITHUB_OUTPUT
+            echo "✅ Sync completed successfully"
+          else
+            echo "success=false" >> $GITHUB_OUTPUT
+            echo "❌ Sync failed"
+            exit 1
+          fi
+
+      - name: 📊 Parse Sync Results
+        id: parse_results
+        run: |
+          if [ -f "data/stats.json" ]; then
+            domains_count=$(jq -r '.uniqueDomains // 0' data/stats.json)
+            new_domains=$(jq -r '.newDomains // 0' data/stats.json)
+            removed_domains=$(jq -r '.removedDomains // 0' data/stats.json)
+            processing_time=$(jq -r '.processingTime // 0' data/stats.json)
+            successful_downloads=$(jq -r '.successfulDownloads // 0' data/stats.json)
+            total_repositories=$(jq -r '.totalRepositories // 1' data/stats.json)
+            
+            success_rate=$(echo "scale=1; $successful_downloads * 100 / $total_repositories" | bc -l 2>/dev/null || echo "0.0")
+            
+            echo "domains_count=${domains_count}" >> $GITHUB_OUTPUT
+            echo "new_domains=${new_domains}" >> $GITHUB_OUTPUT
+            echo "removed_domains=${removed_domains}" >> $GITHUB_OUTPUT
+            echo "processing_time=${processing_time}" >> $GITHUB_OUTPUT
+            echo "success_rate=${success_rate}" >> $GITHUB_OUTPUT
+            
+            echo "📊 Parsed Results:"
+            echo "   • Domains: ${domains_count}"
+            echo "   • New: ${new_domains}"
+            echo "   • Removed: ${removed_domains}"
+            echo "   • Success Rate: ${success_rate}%"
+          else
+            echo "⚠️ No stats file found"
+            echo "domains_count=0" >> $GITHUB_OUTPUT
+            echo "new_domains=0" >> $GITHUB_OUTPUT
+            echo "removed_domains=0" >> $GITHUB_OUTPUT
+            echo "processing_time=0" >> $GITHUB_OUTPUT
+            echo "success_rate=0.0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 📊 Update README Statistics
+        if: steps.execute_sync.outputs.success == 'true'
+        run: |
+          echo "📊 Updating README with latest statistics..."
+          
+          # Run the README stats update script
+          if ./scripts/update-readme-stats.sh; then
+            echo "✅ README statistics updated successfully"
+          else
+            echo "⚠️ README update failed, but continuing with sync process"
+          fi
+
+      - name: 📝 Generate Detailed Report
+        id: generate_report
+        run: |
+          timestamp=$(date -Iseconds)
+          report_file="reports/manual-sync-${timestamp//[:]/-}.md"
+          mkdir -p reports
+          
+          cat > "$report_file" << 'EOF'
+          # 🔄 Manual Domain Sync Report
+          
+          **Generated**: $timestamp
+          **Sync Type**: ${{ needs.validate_trigger.outputs.sync_type }}
+          **Triggered By**: @${{ github.actor }}
+          **Workflow Run**: ${{ github.run_id }}
+          
+          ## 📊 Summary Statistics
+          
+          | Metric | Value |
+          |--------|-------|
+          | Total Domains | ${{ steps.parse_results.outputs.domains_count }} |
+          | New Domains | ${{ steps.parse_results.outputs.new_domains }} |
+          | Removed Domains | ${{ steps.parse_results.outputs.removed_domains }} |
+          | Processing Time | ${{ steps.parse_results.outputs.processing_time }}ms |
+          | Success Rate | ${{ steps.parse_results.outputs.success_rate }}% |
+          
+          ## 📈 Analysis
+          
+          EOF
+          
+          # Add analysis based on results
+          if [ "${{ steps.parse_results.outputs.new_domains }}" -gt 0 ]; then
+            echo "### 🎉 Growth Detected" >> "$report_file"
+            echo "${{ steps.parse_results.outputs.new_domains }} new disposable email domains were discovered and added." >> "$report_file"
+            echo "" >> "$report_file"
+          fi
+          
+          if [ "${{ steps.parse_results.outputs.removed_domains }}" -gt 0 ]; then
+            echo "### 🧹 Cleanup Performed" >> "$report_file"
+            echo "${{ steps.parse_results.outputs.removed_domains }} domains were removed from the list." >> "$report_file"
+            echo "" >> "$report_file"
+          fi
+          
+          # Add repository details if available
+          if [ -f "data/stats.json" ]; then
+            echo "## 🔍 Repository Details" >> "$report_file"
+            echo "" >> "$report_file"
+            
+            # Extract repository stats using jq
+            jq -r '.repositoryStats[] | "- **\(.url)**: \(if .success then "✅" else "❌" end) (\(.domainsCount) domains)"' data/stats.json >> "$report_file" 2>/dev/null || echo "Unable to parse repository details" >> "$report_file"
+          fi
+          
+          echo "report_path=${report_file}" >> $GITHUB_OUTPUT
+          echo "✅ Generated detailed report: $report_file"
+
+      - name: 📤 Upload Report Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: manual-sync-report-${{ github.run_id }}
+          path: ${{ steps.generate_report.outputs.report_path }}
+          retention-days: 30
+
+      - name: 📋 Notify Results
+        if: needs.validate_trigger.outputs.trigger_type == 'comment'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issueNumber = ${{ needs.validate_trigger.outputs.issue_number }};
+            const success = '${{ steps.execute_sync.outputs.success }}' === 'true';
+            const notificationLevel = '${{ github.event.inputs.notification_level }}' || 'normal';
+            
+            let body = success ? 
+              `✅ **Manual Domain Sync Completed Successfully**\n\n` :
+              `❌ **Manual Domain Sync Failed**\n\n`;
+            
+            if (success) {
+              body += `**📊 Results Summary:**\n`;
+              body += `- **Total Domains**: ${{ steps.parse_results.outputs.domains_count }}\n`;
+              body += `- **New Domains**: ${{ steps.parse_results.outputs.new_domains }}\n`;
+              body += `- **Removed Domains**: ${{ steps.parse_results.outputs.removed_domains }}\n`;
+              body += `- **Success Rate**: ${{ steps.parse_results.outputs.success_rate }}%\n`;
+              body += `- **Processing Time**: ${{ steps.parse_results.outputs.processing_time }}ms\n\n`;
+              
+              if (notificationLevel === 'detailed') {
+                body += `**📁 Generated Files:**\n`;
+                body += `- \`data/domains.txt\` - Plain text domain list\n`;
+                body += `- \`data/domains.json\` - JSON format with metadata\n`;
+                body += `- \`data/stats.json\` - Detailed statistics\n`;
+                body += `- \`data/report.md\` - Human-readable report\n\n`;
+              }
+            }
+            
+            body += `**🔗 Workflow Details:**\n`;
+            body += `- **Run ID**: [\`${{ github.run_id }}\`](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})\n`;
+            body += `- **Sync Type**: ${{ needs.validate_trigger.outputs.sync_type }}\n`;
+            body += `- **Triggered By**: @${{ github.actor }}\n`;
+            
+            if ('${{ steps.generate_report.outputs.report_path }}') {
+              body += `- **Detailed Report**: Available in workflow artifacts\n`;
+            }
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: body
+            });
+
+  # ========================================
+  # COMMIT CHANGES (if any)
+  # ========================================
+  commit_changes:
+    name: 💾 Commit Changes
+    runs-on: ubuntu-latest
+    needs: [validate_trigger, manual_sync]
+    if: needs.manual_sync.outputs.sync_success == 'true'
+
+    steps:
+      - name: 🚀 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🏗️ Setup Bun Runtime
+        uses: oven-sh/setup-bun@v1
+
+      - name: 📦 Install Dependencies
+        run: bun install --frozen-lockfile
+
+      - name: 🔄 Re-run Sync (to get fresh data)
+        run: |
+          # Re-run sync to ensure we have the latest data
+          case "${{ needs.validate_trigger.outputs.sync_type }}" in
+            "verify-only")
+              echo "ℹ️ Verify-only mode - skipping data generation"
+              exit 0
+              ;;
+            *)
+              bun run src/cli.ts --verbose
+              ;;
+          esac
+
+      - name: 🔍 Check for Changes
+        id: check_changes
+        run: |
+          git add .
+          
+          if git diff --cached --quiet; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ No changes to commit"
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "✅ Changes detected"
+            
+            echo "📋 Changed files:"
+            git diff --cached --name-only | sed 's/^/   • /'
+          fi
+
+      - name: 📝 Commit and Push Changes
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          timestamp=$(date -Iseconds)
+          
+          git add .
+          git commit -m "🔄 Manual sync: Update disposable email domains
+
+          📊 Sync Results:
+          • Total domains: ${{ needs.manual_sync.outputs.domains_count }}
+          • New domains: ${{ needs.manual_sync.outputs.new_domains }}
+          • Removed domains: ${{ needs.manual_sync.outputs.removed_domains }}
+          • Success rate: ${{ needs.manual_sync.outputs.success_rate }}%
+          • Processing time: ${{ needs.manual_sync.outputs.processing_time }}ms
+          
+          🤖 Manual sync triggered by @${{ github.actor }}
+          🕐 Sync completed: ${timestamp}
+          🔧 Sync type: ${{ needs.validate_trigger.outputs.sync_type }}
+          📋 Workflow run: ${{ github.run_id }}"
+          
+          git push origin ${{ github.ref_name }}
+          echo "✅ Changes committed and pushed to ${{ github.ref_name }}"
+
+  # ========================================
+  # FINAL SUMMARY
+  # ========================================
+  summary:
+    name: 📋 Workflow Summary
+    runs-on: ubuntu-latest
+    needs: [validate_trigger, manual_sync, commit_changes]
+    if: always() && needs.validate_trigger.outputs.should_run == 'true'
+
+    steps:
+      - name: 📊 Generate Workflow Summary
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const syncSuccess = '${{ needs.manual_sync.outputs.sync_success }}' === 'true';
+            const hasChanges = '${{ needs.commit_changes.outputs.has_changes }}' === 'true';
+            const triggerType = '${{ needs.validate_trigger.outputs.trigger_type }}';
+            const syncType = '${{ needs.validate_trigger.outputs.sync_type }}';
+            
+            let summary = '## 🔧 Manual Sync & Maintenance Summary\n\n';
+            
+            summary += '| Component | Status |\n';
+            summary += '|-----------|--------|\n';
+            summary += `| 🔄 **Domain Sync** | ${syncSuccess ? '✅ Success' : '❌ Failed'} |\n`;
+            summary += `| 💾 **Commit Changes** | ${hasChanges ? '✅ Committed' : 'ℹ️ No Changes'} |\n`;
+            summary += `| 🎯 **Trigger Type** | ${triggerType === 'manual' ? '🖱️ Manual' : '💬 Comment'} |\n`;
+            summary += `| ⚙️ **Sync Type** | ${syncType} |\n\n`;
+            
+            if (syncSuccess) {
+              summary += '### 📈 Sync Results\n';
+              summary += `- **Total Domains**: ${{ needs.manual_sync.outputs.domains_count }}\n`;
+              summary += `- **New Domains**: ${{ needs.manual_sync.outputs.new_domains }}\n`;
+              summary += `- **Removed Domains**: ${{ needs.manual_sync.outputs.removed_domains }}\n`;
+              summary += `- **Success Rate**: ${{ needs.manual_sync.outputs.success_rate }}%\n`;
+              summary += `- **Processing Time**: ${{ needs.manual_sync.outputs.processing_time }}ms\n\n`;
+            }
+            
+            if ('${{ needs.manual_sync.outputs.report_path }}') {
+              summary += '### 📄 Reports\n';
+              summary += '- Detailed report available in workflow artifacts\n\n';
+            }
+            
+            summary += `### 🔗 Details\n`;
+            summary += `- **Triggered by**: @${{ github.actor }}\n`;
+            summary += `- **Workflow Run**: [\`${{ github.run_id }}\`](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})\n`;
+            
+            await core.summary.addRaw(summary).write();
+            
+            console.log('📋 Manual Sync Workflow Summary');
+            console.log('=================================');
+            console.log(`🔄 Sync Status: ${syncSuccess ? 'SUCCESS' : 'FAILED'}`);
+            console.log(`💾 Changes: ${hasChanges ? 'COMMITTED' : 'NONE'}`);
+            console.log(`🎯 Trigger: ${triggerType.toUpperCase()}`);
+            console.log(`⚙️ Sync Type: ${syncType.toUpperCase()}`);
+            
+            if (syncSuccess) {
+              console.log(`📊 Results: ${needs.manual_sync.outputs.domains_count} domains (+${{ needs.manual_sync.outputs.new_domains }}, -${{ needs.manual_sync.outputs.removed_domains }})`);
+            }

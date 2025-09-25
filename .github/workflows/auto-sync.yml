@@ -1,0 +1,678 @@
+name: 🔄 Auto Sync Disposable Email Domains
+
+on:
+  schedule:
+    # Run twice daily at 6 AM and 6 PM UTC
+    - cron: '0 6,18 * * *'
+  workflow_dispatch:
+    inputs:
+      force_sync:
+        type: boolean
+        description: 'Force sync even if no changes detected'
+        required: false
+        default: false
+      skip_auto_merge:
+        type: boolean
+        description: 'Skip automatic merge (create PR only)'
+        required: false
+        default: false
+      custom_branch:
+        type: string
+        description: 'Custom branch name for sync'
+        required: false
+        default: ''
+
+concurrency:
+  group: auto-sync
+  cancel-in-progress: false
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  FORCE_COLOR: 3
+  NODE_ENV: production
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+  checks: write
+
+jobs:
+  # ========================================
+  # SYNC DOMAINS
+  # ========================================
+  sync:
+    name: 🔄 Sync Disposable Email Domains
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    outputs:
+      has_changes: ${{ steps.check_changes.outputs.has_changes }}
+      domains_count: ${{ steps.sync_stats.outputs.domains_count }}
+      new_domains: ${{ steps.sync_stats.outputs.new_domains }}
+      removed_domains: ${{ steps.sync_stats.outputs.removed_domains }}
+      success_rate: ${{ steps.sync_stats.outputs.success_rate }}
+      processing_time: ${{ steps.sync_stats.outputs.processing_time }}
+      failed_repos: ${{ steps.sync_stats.outputs.failed_repos }}
+      pr_number: ${{ steps.create_pr.outputs.pr_number }}
+      sync_branch: ${{ steps.create_branch.outputs.branch_name }}
+
+    steps:
+      - name: 🚀 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🏗️ Setup Bun Runtime
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: 📦 Install Dependencies
+        run: |
+          bun install --frozen-lockfile
+          echo "✅ Dependencies installed successfully"
+
+      - name: 🔧 Setup Git Configuration
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: 🌿 Create Sync Branch
+        id: create_branch
+        run: |
+          timestamp=$(date +"%Y%m%d-%H%M%S")
+          if [ -n "${{ github.event.inputs.custom_branch }}" ]; then
+            branch_name="${{ github.event.inputs.custom_branch }}"
+          else
+            branch_name="auto-sync/domains-${timestamp}"
+          fi
+          
+          echo "branch_name=${branch_name}" >> $GITHUB_OUTPUT
+          echo "🌿 Creating branch: ${branch_name}"
+          
+          git checkout -b "${branch_name}"
+          git push -u origin "${branch_name}"
+
+      - name: 📊 Backup Current Data
+        run: |
+          mkdir -p backup
+          if [ -f "data/domains.json" ]; then
+            cp data/domains.json backup/domains-pre-sync.json
+            echo "✅ Backed up current domains.json"
+          fi
+          if [ -f "data/stats.json" ]; then
+            cp data/stats.json backup/stats-pre-sync.json
+            echo "✅ Backed up current stats.json"
+          fi
+
+      - name: 🔄 Execute Domain Sync
+        id: sync_domains
+        run: |
+          echo "🚀 Starting domain synchronization..."
+          
+          # Run the sync with verbose output and capture the result
+          if bun run src/cli.ts --verbose --timeout 45000 --concurrency 8 --retries 5; then
+            echo "sync_success=true" >> $GITHUB_OUTPUT
+            echo "✅ Domain sync completed successfully"
+          else
+            echo "sync_success=false" >> $GITHUB_OUTPUT
+            echo "❌ Domain sync failed"
+            exit 1
+          fi
+
+      - name: 📈 Extract Sync Statistics
+        id: sync_stats
+        run: |
+          if [ -f "data/stats.json" ]; then
+            # Parse stats using jq for reliable JSON processing
+            domains_count=$(jq -r '.uniqueDomains // 0' data/stats.json)
+            new_domains=$(jq -r '.newDomains // 0' data/stats.json)
+            removed_domains=$(jq -r '.removedDomains // 0' data/stats.json)
+            processing_time=$(jq -r '.processingTime // 0' data/stats.json)
+            successful_downloads=$(jq -r '.successfulDownloads // 0' data/stats.json)
+            total_repositories=$(jq -r '.totalRepositories // 1' data/stats.json)
+            failed_downloads=$(jq -r '.failedDownloads // 0' data/stats.json)
+            
+            # Calculate success rate
+            if [ "$total_repositories" -gt 0 ]; then
+              success_rate=$(echo "scale=1; $successful_downloads * 100 / $total_repositories" | bc -l)
+            else
+              success_rate="0.0"
+            fi
+            
+            # Get failed repository details
+            failed_repos=$(jq -r '[.repositoryStats[] | select(.success == false) | .url] | join(", ")' data/stats.json 2>/dev/null || echo "")
+            
+            echo "domains_count=${domains_count}" >> $GITHUB_OUTPUT
+            echo "new_domains=${new_domains}" >> $GITHUB_OUTPUT
+            echo "removed_domains=${removed_domains}" >> $GITHUB_OUTPUT
+            echo "success_rate=${success_rate}" >> $GITHUB_OUTPUT
+            echo "processing_time=${processing_time}" >> $GITHUB_OUTPUT
+            echo "failed_repos=${failed_repos}" >> $GITHUB_OUTPUT
+            
+            echo "📊 Sync Statistics:"
+            echo "   • Total domains: ${domains_count}"
+            echo "   • New domains: ${new_domains}" 
+            echo "   • Removed domains: ${removed_domains}"
+            echo "   • Success rate: ${success_rate}%"
+            echo "   • Processing time: ${processing_time}ms"
+          else
+            echo "⚠️ Stats file not found, using default values"
+            echo "domains_count=0" >> $GITHUB_OUTPUT
+            echo "new_domains=0" >> $GITHUB_OUTPUT
+            echo "removed_domains=0" >> $GITHUB_OUTPUT
+            echo "success_rate=0.0" >> $GITHUB_OUTPUT
+            echo "processing_time=0" >> $GITHUB_OUTPUT
+            echo "failed_repos=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 📊 Update README Statistics
+        if: steps.execute_sync.outputs.success == 'true'
+        run: |
+          echo "📊 Updating README with latest statistics..."
+          
+          # Run the README stats update script
+          if ./scripts/update-readme-stats.sh; then
+            echo "✅ README statistics updated successfully"
+          else
+            echo "⚠️ README update failed, but continuing with sync process"
+          fi
+
+      - name: 🔍 Check for Changes
+        id: check_changes
+        run: |
+          git add .
+          
+          if git diff --cached --quiet; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ No changes detected in domain data"
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "✅ Changes detected in domain data"
+            
+            # Show what changed
+            echo "📋 Changed files:"
+            git diff --cached --name-only | sed 's/^/   • /'
+          fi
+
+      - name: 📝 Commit Changes
+        if: steps.check_changes.outputs.has_changes == 'true' || github.event.inputs.force_sync == 'true'
+        run: |
+          timestamp=$(date -Iseconds)
+          
+          git add .
+          git commit -m "🔄 Auto-sync: Update disposable email domains
+
+          📊 Sync Summary:
+          • Total domains: ${{ steps.sync_stats.outputs.domains_count }}
+          • New domains added: ${{ steps.sync_stats.outputs.new_domains }}
+          • Domains removed: ${{ steps.sync_stats.outputs.removed_domains }}
+          • Repository success rate: ${{ steps.sync_stats.outputs.success_rate }}%
+          • Processing time: ${{ steps.sync_stats.outputs.processing_time }}ms
+          • Sync timestamp: ${timestamp}
+          
+          Generated by GitHub Actions Auto-Sync Workflow
+          Branch: ${{ steps.create_branch.outputs.branch_name }}
+          Workflow: ${{ github.workflow }}
+          Run ID: ${{ github.run_id }}"
+          
+          git push origin "${{ steps.create_branch.outputs.branch_name }}"
+          echo "✅ Changes committed and pushed"
+
+      - name: 🎯 Create Pull Request
+        if: steps.check_changes.outputs.has_changes == 'true' || github.event.inputs.force_sync == 'true'
+        id: create_pr
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const timestamp = new Date().toISOString();
+            const processingTimeSeconds = (${{ steps.sync_stats.outputs.processing_time }} / 1000).toFixed(2);
+            
+            // Generate detailed PR body with statistics and analysis
+            const prBody = `## 🔄 Automated Disposable Email Domains Sync
+            
+            This PR contains the latest synchronization of disposable email domains from configured sources.
+            
+            ### 📊 Sync Statistics
+            
+            | Metric | Value |
+            |--------|-------|
+            | 📧 **Total Domains** | **${{ steps.sync_stats.outputs.domains_count }}** |
+            | 🆕 **New Domains** | **${{ steps.sync_stats.outputs.new_domains }}** |
+            | 🗑️ **Removed Domains** | **${{ steps.sync_stats.outputs.removed_domains }}** |
+            | ⏱️ **Processing Time** | **${processingTimeSeconds}s** |
+            | ✅ **Success Rate** | **${{ steps.sync_stats.outputs.success_rate }}%** |
+            | 🕐 **Sync Time** | ${timestamp} |
+            
+            ### 📈 Change Analysis
+            
+            ${${{ steps.sync_stats.outputs.new_domains }} > 0 ? 
+              '🎉 **Domain Growth**: ' + ${{ steps.sync_stats.outputs.new_domains }} + ' new disposable email domains detected and added.' : 
+              '📊 **No New Domains**: No new domains were found in this sync cycle.'
+            }
+            
+            ${${{ steps.sync_stats.outputs.removed_domains }} > 0 ? 
+              '🧹 **Cleanup**: ' + ${{ steps.sync_stats.outputs.removed_domains }} + ' domains were removed (likely no longer active or moved to allowlist).' : 
+              '✨ **No Removals**: All existing domains remain valid.'
+            }
+            
+            ### 🔍 Repository Status
+            
+            ${${{ steps.sync_stats.outputs.success_rate }} >= 90 ? 
+              '✅ **Excellent**: All repositories synced successfully!' : 
+              ${{ steps.sync_stats.outputs.success_rate }} >= 80 ? 
+                '⚠️ **Good**: Most repositories synced successfully with minor issues.' :
+                '❌ **Attention Needed**: Multiple repositories failed to sync.'
+            }
+            
+            ${`${{ steps.sync_stats.outputs.failed_repos }}`.length > 0 ? 
+              '#### ⚠️ Failed Repositories\n\nThe following repositories failed to sync:\n' +
+              `${{ steps.sync_stats.outputs.failed_repos }}`.split(', ').map(url => url ? '• ' + url : '').filter(Boolean).join('\n') +
+              '\n\n💡 **Action Required**: These failures should be investigated to ensure complete domain coverage.' :
+              '#### ✅ All Repositories Successful\n\nAll configured repositories were successfully synchronized.'
+            }
+            
+            ### 🤖 Automation Details
+            
+            - **Workflow**: \`${{ github.workflow }}\`
+            - **Branch**: \`${{ steps.create_branch.outputs.branch_name }}\`
+            - **Run ID**: [\`${{ github.run_id }}\`](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            - **Trigger**: ${context.eventName === 'schedule' ? 'Scheduled execution' : 'Manual trigger'}
+            
+            ### 📁 Updated Files
+            
+            - \`data/domains.txt\` - Plain text domain list
+            - \`data/domains.json\` - JSON format with metadata
+            - \`data/stats.json\` - Detailed synchronization statistics
+            - \`data/report.md\` - Human-readable sync report
+            
+            ---
+            
+            **🔄 This PR will be automatically merged** if all checks pass and no conflicts are detected.
+            
+            To prevent auto-merge, add the \`hold\` label to this PR.
+            `;
+            
+            try {
+              const { data: pullRequest } = await github.rest.pulls.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `🔄 Auto-sync: Update disposable email domains (+${{ steps.sync_stats.outputs.new_domains }}, -${{ steps.sync_stats.outputs.removed_domains }})`,
+                head: '${{ steps.create_branch.outputs.branch_name }}',
+                base: 'master',
+                body: prBody,
+                maintainer_can_modify: true
+              });
+              
+              console.log(`✅ Pull request created: #${pullRequest.number}`);
+              core.setOutput('pr_number', pullRequest.number);
+              
+              // Add labels based on sync results
+              const labels = ['auto-sync', 'domains-update'];
+              
+              if (${{ steps.sync_stats.outputs.new_domains }} > 0) {
+                labels.push('enhancement');
+              }
+              
+              if (${{ steps.sync_stats.outputs.success_rate }} < 90) {
+                labels.push('needs-review');
+              }
+              
+              if (${{ steps.sync_stats.outputs.new_domains }} > 100) {
+                labels.push('major-update');
+              }
+              
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pullRequest.number,
+                labels: labels
+              });
+              
+              return pullRequest.number;
+            } catch (error) {
+              core.setFailed(`Failed to create pull request: ${error.message}`);
+              throw error;
+            }
+
+  # ========================================
+  # QUALITY CHECKS
+  # ========================================
+  quality_checks:
+    name: 🔍 Quality Assurance
+    runs-on: ubuntu-latest
+    needs: sync
+    if: needs.sync.outputs.has_changes == 'true' || github.event.inputs.force_sync == 'true'
+    timeout-minutes: 10
+
+    steps:
+      - name: 🚀 Checkout PR Branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.sync.outputs.sync_branch }}
+          fetch-depth: 1
+
+      - name: 🏗️ Setup Bun Runtime
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: 📦 Install Dependencies
+        run: bun install --frozen-lockfile
+
+      - name: 🧪 Run Tests
+        run: |
+          echo "🧪 Running comprehensive test suite..."
+          bun test --coverage --reporter=verbose
+
+      - name: 🔍 Validate Domain Format
+        run: |
+          echo "🔍 Validating domain format and integrity..."
+          
+          # Check if domains.txt exists and is not empty
+          if [ ! -s "data/domains.txt" ]; then
+            echo "❌ domains.txt is empty or missing"
+            exit 1
+          fi
+          
+          # Check for basic domain format validity
+          invalid_domains=$(grep -E -v '^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$' data/domains.txt | head -5)
+          
+          if [ -n "$invalid_domains" ]; then
+            echo "⚠️ Found potentially invalid domains:"
+            echo "$invalid_domains"
+            echo "ℹ️ This might be acceptable for some edge cases, continuing..."
+          fi
+          
+          # Check for duplicates
+          duplicates=$(sort data/domains.txt | uniq -d | head -3)
+          if [ -n "$duplicates" ]; then
+            echo "❌ Found duplicate domains:"
+            echo "$duplicates"
+            exit 1
+          fi
+          
+          # Validate JSON structure
+          if [ -f "data/domains.json" ]; then
+            if jq empty data/domains.json; then
+              echo "✅ domains.json is valid JSON"
+            else
+              echo "❌ domains.json contains invalid JSON"
+              exit 1
+            fi
+          fi
+          
+          echo "✅ Domain validation completed successfully"
+
+      - name: 📊 Generate Quality Report
+        run: |
+          echo "📊 Generating quality assurance report..."
+          
+          total_domains=$(wc -l < data/domains.txt)
+          json_domains=$(jq '.domains | length' data/domains.json 2>/dev/null || echo "0")
+          
+          echo "## 🔍 Quality Assurance Report" > qa_report.md
+          echo "" >> qa_report.md
+          echo "- **Total Domains in TXT**: $total_domains" >> qa_report.md
+          echo "- **Total Domains in JSON**: $json_domains" >> qa_report.md
+          echo "- **Format Consistency**: $([ "$total_domains" -eq "$json_domains" ] && echo "✅ Consistent" || echo "⚠️ Mismatch detected")" >> qa_report.md
+          echo "- **File Sizes**:" >> qa_report.md
+          echo "  - domains.txt: $(stat -f%z data/domains.txt 2>/dev/null || stat -c%s data/domains.txt) bytes" >> qa_report.md
+          echo "  - domains.json: $(stat -f%z data/domains.json 2>/dev/null || stat -c%s data/domains.json) bytes" >> qa_report.md
+          echo "" >> qa_report.md
+          echo "_Report generated at $(date -Iseconds)_" >> qa_report.md
+          
+          cat qa_report.md
+          echo "✅ Quality report generated"
+
+  # ========================================
+  # AUTO MERGE
+  # ========================================
+  auto_merge:
+    name: 🚀 Auto Merge
+    runs-on: ubuntu-latest
+    needs: [sync, quality_checks]
+    if: |
+      always() && 
+      needs.sync.result == 'success' && 
+      needs.quality_checks.result == 'success' &&
+      github.event.inputs.skip_auto_merge != 'true' &&
+      (needs.sync.outputs.has_changes == 'true' || github.event.inputs.force_sync == 'true')
+    timeout-minutes: 5
+
+    steps:
+      - name: 🔍 Check PR Status
+        id: pr_status
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = ${{ needs.sync.outputs.pr_number }};
+            
+            try {
+              // Get PR details
+              const { data: pr } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber
+              });
+              
+              console.log(`📋 PR #${prNumber} status: ${pr.state}`);
+              console.log(`🔄 Mergeable: ${pr.mergeable}`);
+              console.log(`🏷️ Labels: ${pr.labels.map(l => l.name).join(', ')}`);
+              
+              // Check if PR has 'hold' label
+              const hasHoldLabel = pr.labels.some(label => label.name === 'hold');
+              
+              if (hasHoldLabel) {
+                console.log('⏸️ PR has "hold" label - skipping auto-merge');
+                core.setOutput('should_merge', 'false');
+                core.setOutput('skip_reason', 'hold_label');
+                return;
+              }
+              
+              if (pr.state !== 'open') {
+                console.log('❌ PR is not open - cannot merge');
+                core.setOutput('should_merge', 'false');
+                core.setOutput('skip_reason', 'not_open');
+                return;
+              }
+              
+              if (pr.mergeable === false) {
+                console.log('❌ PR has conflicts - cannot auto-merge');
+                core.setOutput('should_merge', 'false');
+                core.setOutput('skip_reason', 'conflicts');
+                return;
+              }
+              
+              console.log('✅ PR is ready for auto-merge');
+              core.setOutput('should_merge', 'true');
+              core.setOutput('pr_title', pr.title);
+              
+            } catch (error) {
+              console.error(`❌ Failed to check PR status: ${error.message}`);
+              core.setOutput('should_merge', 'false');
+              core.setOutput('skip_reason', 'api_error');
+            }
+
+      - name: 🚀 Merge Pull Request
+        if: steps.pr_status.outputs.should_merge == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = ${{ needs.sync.outputs.pr_number }};
+            
+            try {
+              // Add a comment before merging
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: `🤖 **Auto-Merge Initiated**
+                
+                Quality checks passed successfully:
+                ✅ Domain sync completed
+                ✅ Format validation passed  
+                ✅ No conflicts detected
+                ✅ Tests passed
+                
+                Proceeding with automatic merge...`
+              });
+              
+              // Merge the PR
+              const { data: merge } = await github.rest.pulls.merge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+                commit_title: `🔄 Auto-merge: ${{ steps.pr_status.outputs.pr_title }}`,
+                commit_message: `Automatically merged PR #${prNumber} after successful quality checks.
+                
+                📊 Sync Results:
+                • Total domains: ${{ needs.sync.outputs.domains_count }}
+                • New domains: ${{ needs.sync.outputs.new_domains }}
+                • Removed domains: ${{ needs.sync.outputs.removed_domains }}
+                • Success rate: ${{ needs.sync.outputs.success_rate }}%
+                
+                🤖 Merged by GitHub Actions Auto-Sync Workflow`,
+                merge_method: 'squash'
+              });
+              
+              console.log(`✅ Successfully merged PR #${prNumber}`);
+              console.log(`📝 Merge SHA: ${merge.sha}`);
+              
+              // Clean up the sync branch
+              try {
+                await github.rest.git.deleteRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: `heads/${{ needs.sync.outputs.sync_branch }}`
+                });
+                console.log(`🧹 Cleaned up branch: ${{ needs.sync.outputs.sync_branch }}`);
+              } catch (cleanupError) {
+                console.log(`⚠️ Could not clean up branch: ${cleanupError.message}`);
+              }
+              
+            } catch (error) {
+              console.error(`❌ Failed to merge PR: ${error.message}`);
+              
+              // Add error comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: `❌ **Auto-Merge Failed**
+                
+                Error: ${error.message}
+                
+                Manual intervention required. Please review and merge manually if appropriate.`
+              });
+              
+              throw error;
+            }
+
+      - name: ℹ️ Skip Merge Notification
+        if: steps.pr_status.outputs.should_merge != 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = ${{ needs.sync.outputs.pr_number }};
+            const skipReason = '${{ steps.pr_status.outputs.skip_reason }}';
+            
+            let message = '⏸️ **Auto-Merge Skipped**\n\n';
+            
+            switch (skipReason) {
+              case 'hold_label':
+                message += '🏷️ This PR has the "hold" label, preventing automatic merge.\n\nRemove the label to enable auto-merge, or merge manually when ready.';
+                break;
+              case 'conflicts':
+                message += '⚔️ This PR has merge conflicts that need to be resolved.\n\nPlease resolve conflicts and the workflow will attempt auto-merge again.';
+                break;
+              case 'not_open':
+                message += '📋 This PR is not in an open state.\n\nNo action needed.';
+                break;
+              default:
+                message += `🤔 Reason: ${skipReason}\n\nPlease review the PR status and merge manually if appropriate.`;
+            }
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: message
+            });
+
+  # ========================================
+  # NOTIFICATION & CLEANUP
+  # ========================================
+  notify:
+    name: 📢 Post-Sync Notifications
+    runs-on: ubuntu-latest
+    needs: [sync, quality_checks, auto_merge]
+    if: always() && needs.sync.result == 'success'
+    timeout-minutes: 5
+
+    steps:
+      - name: 📊 Generate Final Summary
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const syncResult = '${{ needs.sync.result }}';
+            const qaResult = '${{ needs.quality_checks.result }}';
+            const mergeResult = '${{ needs.auto_merge.result }}';
+            const hasChanges = '${{ needs.sync.outputs.has_changes }}';
+            
+            console.log('📊 Auto-Sync Workflow Summary');
+            console.log('================================');
+            console.log(`🔄 Sync: ${syncResult}`);
+            console.log(`🔍 Quality Checks: ${qaResult}`);
+            console.log(`🚀 Auto Merge: ${mergeResult}`);
+            console.log(`📝 Changes Detected: ${hasChanges}`);
+            console.log(`📧 Total Domains: ${{ needs.sync.outputs.domains_count }}`);
+            console.log(`🆕 New Domains: ${{ needs.sync.outputs.new_domains }}`);
+            console.log(`🗑️ Removed Domains: ${{ needs.sync.outputs.removed_domains }}`);
+            console.log(`✅ Success Rate: ${{ needs.sync.outputs.success_rate }}%`);
+            
+            if (hasChanges === 'true') {
+              console.log(`🔗 PR: #${{ needs.sync.outputs.pr_number }}`);
+            } else {
+              console.log('ℹ️ No changes detected - no PR created');
+            }
+            
+            // Create a workflow summary
+            const summary = `## 🔄 Disposable Email Domains Auto-Sync Summary
+            
+            | Status | Result |
+            |--------|---------|
+            | 🔄 **Domain Sync** | ${syncResult === 'success' ? '✅ Success' : '❌ Failed'} |
+            | 🔍 **Quality Checks** | ${qaResult === 'success' ? '✅ Passed' : qaResult === 'skipped' ? '⏭️ Skipped' : '❌ Failed'} |
+            | 🚀 **Auto Merge** | ${mergeResult === 'success' ? '✅ Merged' : mergeResult === 'skipped' ? '⏭️ Skipped' : '❌ Failed'} |
+            
+            ### 📈 Domain Statistics
+            - **Total Domains**: ${{ needs.sync.outputs.domains_count }}
+            - **New Domains**: ${{ needs.sync.outputs.new_domains }}
+            - **Removed Domains**: ${{ needs.sync.outputs.removed_domains }}
+            - **Repository Success Rate**: ${{ needs.sync.outputs.success_rate }}%
+            - **Processing Time**: ${{ needs.sync.outputs.processing_time }}ms
+            
+            ${hasChanges === 'true' ? 
+              `### 🔗 Pull Request\n- **PR Number**: #${{ needs.sync.outputs.pr_number }}\n- **Branch**: \`${{ needs.sync.outputs.sync_branch }}\`` : 
+              '### ℹ️ No Changes\nNo domain changes were detected in this sync cycle.'
+            }`;
+            
+            await core.summary.addRaw(summary).write();
+
+      - name: 🏠 Cleanup Workflow Artifacts
+        run: |
+          echo "🧹 Cleaning up temporary files and artifacts..."
+          
+          # Remove any temporary backup files older than 7 days
+          find . -name "*-pre-sync.*" -type f -mtime +7 -delete 2>/dev/null || true
+          
+          echo "✅ Cleanup completed"
+
