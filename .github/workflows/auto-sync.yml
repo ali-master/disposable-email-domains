@@ -113,7 +113,7 @@ jobs:
           echo "🚀 Starting domain synchronization..."
           
           # Run the sync with verbose output and capture the result
-          if bun run src/cli.ts --verbose --timeout 45000 --concurrency 8 --retries 5; then
+          if bun run src/syncer/cli.ts --verbose --timeout 45000 --concurrency 8 --retries 5; then
             echo "sync_success=true" >> $GITHUB_OUTPUT
             echo "✅ Domain sync completed successfully"
           else

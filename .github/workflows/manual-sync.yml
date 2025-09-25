@@ -257,7 +257,7 @@ jobs:
           echo "🔧 Sync arguments: $sync_args"
           
           # Execute the sync
-          if bun run src/cli.ts --config "$config_path" $sync_args; then
+          if bun run src/syncer/cli.ts --config "$config_path" $sync_args; then
             echo "success=true" >> $GITHUB_OUTPUT
             echo "✅ Sync completed successfully"
           else
@@ -449,7 +449,7 @@ jobs:
               exit 0
               ;;
             *)
-              bun run src/cli.ts --verbose
+              bun run src/syncer/cli.ts --verbose
               ;;
           esac
 
