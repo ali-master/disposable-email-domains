@@ -1,7 +1,7 @@
 {
   "name": "@usex/disposable-email-domains",
   "description": "Comprehensive TypeScript SDK for detecting disposable email addresses with real-time synchronization, advanced DNS validation (MX, SPF, DMARC), intelligent caching, and high-performance email validation. Features 119K+ domains from 15+ sources with automatic updates, pattern matching, subdomain checking, and enterprise-grade validation capabilities.",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "type": "module",
   "files": [
     "dist",

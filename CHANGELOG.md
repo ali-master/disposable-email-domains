@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.2.0](https://github.com/ali-master/disposable-email-domains/compare/1.1.1...1.2.0) (2025-09-25)
+
+### Features
+
+* enhance package description and keywords for better clarity ([6f8cf7f](https://github.com/ali-master/disposable-email-domains/commit/6f8cf7fe17274f1b6ee2c2d875147f3b06472e21))
+* enhance README stats injection logic and update markers ([63e9a46](https://github.com/ali-master/disposable-email-domains/commit/63e9a465ce48925dd62f5c4eb686ac1e149768a8))
+* update README and stats report with detailed insights ([0c10374](https://github.com/ali-master/disposable-email-domains/commit/0c10374c1e4f0563e21c17ac2d5dc42fe7af749e))
+* update README description for clarity and consistency ([1e2af60](https://github.com/ali-master/disposable-email-domains/commit/1e2af6005a75917ceec6838297bd6fe9b22f583a))
+* update README with enhanced features and improved layout ([9969e8d](https://github.com/ali-master/disposable-email-domains/commit/9969e8d093ceeb788fc557217d07a14419d3640a))
+
+### Bug Fixes
+
+* manual sync output variable usage in YAML file ([9cf4da0](https://github.com/ali-master/disposable-email-domains/commit/9cf4da0774891393fa68b7b460ebcd0cb9e2ddc5))
+* update sync command paths in auto-sync and manual-sync YAML files ([6771064](https://github.com/ali-master/disposable-email-domains/commit/67710642d4363d853be4fa19ac52a28b9fc3c2cb))
+
 ## [1.1.1](https://github.com/ali-master/disposable-email-domains/compare/1.1.0...1.1.1) (2025-09-25)
 
 ### Bug Fixes
