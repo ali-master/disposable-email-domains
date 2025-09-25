@@ -1,4 +1,29 @@
-# Disposable Email Domains - TypeScript SDK & CLI
+# Disposable Email Domains - TypeScript SDK
+
+<div align="center">
+  <img src="assets/logo.svg" alt="Disposable Email Domains Logo" width="120" height="120">
+  
+  <p><strong>A powerful TypeScript SDK and CLI for detecting disposable email addresses with real-time synchronization and DNS validation</strong></p>
+  
+  [![npm version](https://badge.fury.io/js/%40usex%2Fdisposable-email-domains.svg)](https://www.npmjs.com/package/@usex/disposable-email-domains)
+  [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://www.typescriptlang.org/)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+  [![Tests](https://github.com/ali-master/disposable-email-domains/actions/workflows/test.yml/badge.svg)](https://github.com/ali-master/disposable-email-domains/actions)
+</div>
+
+---
+
+## 🚀 Features
+
+- **🎯 79,502+ Disposable Domains** - database with real-time updates
+- **⚡ High Performance** - Advanced caching, indexing, and analytics engine  
+- **🔧 TypeScript-First** - Fully typed with strict TypeScript definitions
+- **🛡️ Advanced Validation** - Email format, MX record checking, and pattern matching
+- **🌐 DNS Validation** - MX records, SPF, DMARC, and connectivity testing
+- **📊 Analytics & Insights** - Domain statistics, performance metrics, and validation reports
+- **🔄 Multi-Source Sync** - Intelligent deduplication from 8+ active repositories
+- **💾 Flexible Caching** - Memory, Redis, Database, and custom cache adapters
+- **🎨 Extensible Architecture** - Plugin system for custom validation rules
 
 <!-- STATS -->
 ## 📊 Current Statistics
@@ -56,30 +81,7 @@
 </details>
 
 ---
-<!-- END STATS --><div align="center">
-  <img src="assets/logo.svg" alt="Disposable Email Domains Logo" width="120" height="120">
-  
-  <p><strong>A powerful TypeScript SDK and CLI for detecting disposable email addresses with real-time synchronization and DNS validation</strong></p>
-  
-  [![npm version](https://badge.fury.io/js/%40usex%2Fdisposable-email-domains.svg)](https://www.npmjs.com/package/@usex/disposable-email-domains)
-  [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://www.typescriptlang.org/)
-  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-  [![Tests](https://github.com/ali-master/disposable-email-domains/actions/workflows/test.yml/badge.svg)](https://github.com/ali-master/disposable-email-domains/actions)
-</div>
-
----
-
-## 🚀 Features
-
-- **🎯 79,502+ Disposable Domains** - database with real-time updates
-- **⚡ High Performance** - Advanced caching, indexing, and analytics engine  
-- **🔧 TypeScript-First** - Fully typed with strict TypeScript definitions
-- **🛡️ Advanced Validation** - Email format, MX record checking, and pattern matching
-- **🌐 DNS Validation** - MX records, SPF, DMARC, and connectivity testing
-- **📊 Analytics & Insights** - Domain statistics, performance metrics, and validation reports
-- **🔄 Multi-Source Sync** - Intelligent deduplication from 8+ active repositories
-- **💾 Flexible Caching** - Memory, Redis, Database, and custom cache adapters
-- **🎨 Extensible Architecture** - Plugin system for custom validation rules
+<!-- END STATS -->
 
 ## 📦 Installation
 
@@ -652,7 +654,7 @@ Run DNS benchmarks locally:
 bun run benchmark:dns
 ```
 
-## 🔧 CLI Usage with DNS Validation
+## 🔧 CLI Usage with DNS Validation [WIP]
 
 ```bash
 # Validate email with DNS checking
@@ -671,9 +673,6 @@ npx disposable-email-domains check user@example.com --dns-servers 1.1.1.1,8.8.8.
 ## 🔄 Domain Synchronization
 
 We maintain an up-to-date database by synchronizing with 8+ trusted sources:
-
-
-
 For advanced synchronization features and custom source management, see our [Syncer Documentation](./docs/syncer.md).
 
 ## 🧪 Testing
