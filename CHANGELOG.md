@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.1](https://github.com/ali-master/disposable-email-domains/compare/1.1.0...1.1.1) (2025-09-25)
+
+### Bug Fixes
+
+* update test commands in README for consistency and clarity ([06e6736](https://github.com/ali-master/disposable-email-domains/commit/06e67363557ace4649fd6745887fcce9c4529112))
+
 ## 1.1.0 (2025-09-25)
 
 ### Features
