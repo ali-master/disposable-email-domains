@@ -9,7 +9,6 @@
  */
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
-import { join } from "path";
 
 interface RepositoryStats {
   url: string;
@@ -38,6 +37,9 @@ class ReadmeStatsUpdater {
   private readonly statsPath: string;
   private readonly readmePath: string;
   private readonly domainsPath: string;
+
+  private static readonly START_MARKER = "<!-- START STATS -->";
+  private static readonly END_MARKER = "<!-- END STATS -->";
 
   constructor(
     statsPath = "data/stats.json",
@@ -79,7 +81,6 @@ class ReadmeStatsUpdater {
     if (!existsSync(this.statsPath)) {
       throw new Error(`Statistics file not found: ${this.statsPath}`);
     }
-
     const statsContent = readFileSync(this.statsPath, "utf-8");
     return JSON.parse(statsContent) as SyncStatistics;
   }
@@ -91,7 +92,6 @@ class ReadmeStatsUpdater {
     if (!existsSync(this.readmePath)) {
       throw new Error(`README file not found: ${this.readmePath}`);
     }
-
     return readFileSync(this.readmePath, "utf-8");
   }
 
@@ -103,16 +103,18 @@ class ReadmeStatsUpdater {
   }
 
   /**
-   * Inject statistics into README content
+   * Inject statistics into README content.
+   * Flow:
+   * 1. Remove legacy blocks (old markers) to prevent duplicates.
+   * 2. Replace inside existing <!-- START STATS --> ... <!-- END STATS --> if present.
+   * 3. Else insert before Features heading.
+   * 4. Fallback after Features section body.
+   * 5. Last resort append.
    */
   private injectStatistics(readme: string, stats: SyncStatistics): string {
-    const statsSection = this.generateStatsSection(stats);
-
-    // Remove existing stats section if present
-    const cleanedReadme = this.removeExistingStats(readme);
-
-    // Inject new stats section at the top after the title and description
-    return this.insertStatsSection(cleanedReadme, statsSection);
+    const statsSection = this.generateStatsSection(stats).trim();
+    const cleaned = this.removeLegacyBlocks(readme);
+    return this.insertOrReplaceStats(cleaned, statsSection);
   }
 
   /**
@@ -138,17 +140,16 @@ class ReadmeStatsUpdater {
       fileSize = this.formatFileSize(sizeBytes);
     }
 
-    // Check if report.md exists in data folder
+    // Check if report.md exists
     const reportPath = "data/report.md";
     const hasReport = existsSync(reportPath);
 
-    // Calculate repository performance
+    // Repository performance
     const repoStats = Object.values(stats.repositoryStats);
     const avgDownloadTime =
-      repoStats.reduce((sum, repo) => sum + repo.downloadTime, 0) / repoStats.length;
+      repoStats.reduce((sum, repo) => sum + repo.downloadTime, 0) / (repoStats.length || 1);
     const totalDataSize = repoStats.reduce((sum, repo) => sum + repo.fileSize, 0);
 
-    // Build the report link section
     const reportSection = hasReport
       ? `\n> 📋 **[View Detailed Report](${reportPath})** | Last sync analysis and insights`
       : "";
@@ -199,7 +200,7 @@ ${this.generateRepositoryTable(stats.repositoryStats)}
 </details>
 
 ---
-`;
+`.trim();
   }
 
   /**
@@ -208,8 +209,7 @@ ${this.generateRepositoryTable(stats.repositoryStats)}
   private generateRepositoryTable(repositoryStats: Record<string, RepositoryStats>): string {
     const repos = Object.values(repositoryStats)
       .sort((a, b) => b.domainsCount - a.domainsCount)
-      .slice(0, 10); // Top 10 repositories
-
+      .slice(0, 10);
     return repos
       .map((repo) => {
         const repoName = this.extractRepoName(repo.url);
@@ -218,7 +218,6 @@ ${this.generateRepositoryTable(stats.repositoryStats)}
         const performance = repo.success
           ? `${(repo.downloadTime / 1000).toFixed(2)}s (${this.formatFileSize(repo.fileSize)})`
           : repo.errorMessage || "Failed";
-
         return `| [${repoName}](${repo.url}) | ${domains} | ${status} | ${performance} |`;
       })
       .join("\n");
@@ -229,7 +228,7 @@ ${this.generateRepositoryTable(stats.repositoryStats)}
    */
   private extractRepoName(url: string): string {
     const match = url.match(/github\.com\/([^\/]+\/[^\/]+)/);
-    return match ? match[1] : url.replace("https://", "").substring(0, 30);
+    return match ? match[1] : url.replace(/^https?:\/\//, "").substring(0, 30);
   }
 
   /**
@@ -239,12 +238,10 @@ ${this.generateRepositoryTable(stats.repositoryStats)}
     const units = ["B", "KB", "MB", "GB"];
     let size = bytes;
     let unitIndex = 0;
-
     while (size >= 1024 && unitIndex < units.length - 1) {
       size /= 1024;
       unitIndex++;
     }
-
     return `${size.toFixed(1)} ${units[unitIndex]}`;
   }
 
@@ -253,57 +250,67 @@ ${this.generateRepositoryTable(stats.repositoryStats)}
    */
   private calculateGrowthRate(stats: SyncStatistics): string {
     const netChange = stats.newDomains - stats.removedDomains;
+    if (stats.uniqueDomains === 0) return "0.00%";
     const growthPercent = (netChange / stats.uniqueDomains) * 100;
-
-    if (netChange > 0) {
-      return `+${growthPercent.toFixed(2)}%`;
-    } else if (netChange < 0) {
-      return `${growthPercent.toFixed(2)}%`;
-    } else {
-      return "0.00%";
-    }
+    if (netChange > 0) return `+${growthPercent.toFixed(2)}%`;
+    if (netChange < 0) return `${growthPercent.toFixed(2)}%`;
+    return "0.00%";
   }
 
   /**
-   * Remove existing statistics section from README
+   * Remove legacy blocks:
+   * - <!-- STATS --> ... <!-- END STATS -->
+   * - <#comment #comment=" STATS "></#comment> ... <!-- END STATS -->
+   * (We do NOT remove the new <!-- START STATS --> ... <!-- END STATS --> block here.)
    */
-  private removeExistingStats(readme: string): string {
-    // Remove everything between "<!-- STATS -->" and "<!-- END STATS -->" including the markers
-    const statsRegex = /<!-- STATS -->[\s\S]*?<!-- END STATS -->/g;
-    return readme.replace(statsRegex, "").trim();
+  private removeLegacyBlocks(readme: string): string {
+    return readme
+      .replace(/<!--\s*STATS\s*-->[\s\S]*?<!--\s*END\s+STATS\s*-->/gi, "")
+      .replace(
+        /<#comment\s+#comment\s*=\s*["']\s*STATS\s*["']\s*><\/#comment>[\s\S]*?<!--\s*END\s+STATS\s*-->/gi,
+        "",
+      )
+      .trim();
   }
 
   /**
-   * Insert statistics section at the correct position
+   * Core insertion / replacement logic using the new standard markers.
    */
-  private insertStatsSection(readme: string, statsSection: string): string {
-    // Find where to insert the stats section - after the Features section
-    const insertAfterRegex = /(?:^## Features[\s\S]*?(?=^## |^###|\Z))/m;
-    const match = readme.match(insertAfterRegex);
+  private insertOrReplaceStats(readme: string, statsContent: string): string {
+    const start = ReadmeStatsUpdater.START_MARKER;
+    const end = ReadmeStatsUpdater.END_MARKER;
 
-    if (match) {
-      const insertPosition = match.index! + match[0].length;
-      // Clean up any excessive newlines before inserting
-      const beforeStats = readme.slice(0, insertPosition).replace(/\n{3,}$/, "\n\n");
-      const afterStats = readme.slice(insertPosition).replace(/^\n+/, "\n");
+    const existingBlockRegex = /<!--\s*START\s+STATS\s*-->[\s\S]*?<!--\s*END\s+STATS\s*-->/i;
 
-      return beforeStats + "<!-- STATS -->" + statsSection + "<!-- END STATS -->" + afterStats;
+    // 1. Replace existing block content.
+    if (existingBlockRegex.test(readme)) {
+      return readme.replace(existingBlockRegex, `${start}\n${statsContent.trim()}\n${end}`);
     }
 
-    // Fallback: insert after first section
-    const fallbackRegex = /(?:^# .*?\n[\s\S]*?\n)/m;
-    const fallbackMatch = readme.match(fallbackRegex);
+    const newBlock = `${start}\n${statsContent.trim()}\n${end}\n`;
 
-    if (fallbackMatch) {
-      const insertPosition = fallbackMatch.index! + fallbackMatch[0].length;
-      const beforeStats = readme.slice(0, insertPosition).replace(/\n{3,}$/, "\n\n");
-      const afterStats = readme.slice(insertPosition).replace(/^\n+/, "\n");
-
-      return beforeStats + "<!-- STATS -->" + statsSection + "<!-- END STATS -->" + afterStats;
+    // 2. Primary insertion BEFORE Features heading
+    const featuresHeadingRegex = /^##[^\n]*Features[^\n]*$/im;
+    const featuresMatch = readme.match(featuresHeadingRegex);
+    if (featuresMatch && typeof featuresMatch.index === "number") {
+      const idx = featuresMatch.index;
+      const before = readme.slice(0, idx).replace(/\n{3,}$/, "\n\n");
+      const after = readme.slice(idx).replace(/^\n+/, "");
+      return `${before}${before.endsWith("\n") ? "" : "\n"}${newBlock}${after}`;
     }
 
-    // Last resort: prepend to content
-    return "<!-- STATS -->" + statsSection + "<!-- END STATS -->\n\n" + readme;
+    // 3. Fallback: after entire Features section block
+    const afterFeaturesRegex = /(?:^##[^\n]*Features[^\n]*\n[\s\S]*?(?=^## |^###|\Z))/m;
+    const afterFeaturesMatch = readme.match(afterFeaturesRegex);
+    if (afterFeaturesMatch && typeof afterFeaturesMatch.index === "number") {
+      const insertPos = afterFeaturesMatch.index + afterFeaturesMatch[0].length;
+      const pre = readme.slice(0, insertPos).replace(/\n{3,}$/, "\n\n");
+      const post = readme.slice(insertPos).replace(/^\n+/, "\n");
+      return `${pre}${newBlock}${post}`;
+    }
+
+    // 4. Last resort: append
+    return `${readme.replace(/\n+$/, "\n\n")}${newBlock}`;
   }
 
   /**
@@ -322,7 +329,6 @@ ${this.generateRepositoryTable(stats.repositoryStats)}
     console.log(`🔄 Duplicates Removed: ${stats.duplicates.toLocaleString()}`);
     console.log(`📊 Last Sync: ${new Date(stats.lastSyncTimestamp).toISOString()}`);
 
-    // Set GitHub Actions output variables if running in GitHub Actions
     if (process.env.GITHUB_ACTIONS) {
       console.log(`::set-output name=total_domains::${stats.uniqueDomains}`);
       console.log(`::set-output name=new_domains::${stats.newDomains}`);
@@ -354,9 +360,8 @@ async function main(): Promise<void> {
   }
 }
 
-// Execute if called directly
 if (import.meta.main) {
-  main();
+  void main();
 }
 
 export { ReadmeStatsUpdater, type SyncStatistics, type RepositoryStats };

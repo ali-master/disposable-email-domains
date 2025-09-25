@@ -25,7 +25,7 @@
 - **💾 Flexible Caching** - Memory, Redis, Database, and custom cache adapters
 - **🎨 Extensible Architecture** - Plugin system for custom validation rules
 
-<!-- STATS -->
+<!-- START STATS -->
 ## 📊 Current Statistics
 
 > **Last Updated**: September 25, 2025 at 02:46 PM GMT+3:30 | **Next Sync**: Automated twice daily (6 AM & 6 PM UTC)
