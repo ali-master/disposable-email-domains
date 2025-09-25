@@ -1,0 +1,160 @@
+<svg width="1280" height="640" viewBox="0 0 1280 640" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="backgroundGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667EEA;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#764BA2;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#F093FB;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="cardGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.95" />
+      <stop offset="100%" style="stop-color:#ffffff;stop-opacity:0.9" />
+    </linearGradient>
+    <linearGradient id="logoShieldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667EEA;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764BA2;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="logoEmailGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF6B6B;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FF8E53;stop-opacity:1" />
+    </linearGradient>
+    <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="8"/>
+      <feOffset dx="4" dy="8" result="offset"/>
+      <feFlood flood-color="#000" flood-opacity="0.15"/>
+      <feComposite in2="offset" operator="in"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="logoShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="4"/>
+      <feOffset dx="2" dy="4" result="offset"/>
+      <feFlood flood-color="#000" flood-opacity="0.2"/>
+      <feComposite in2="offset" operator="in"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="640" fill="url(#backgroundGradient)"/>
+
+  <!-- Decorative Background Elements -->
+  <circle cx="100" cy="100" r="40" fill="white" opacity="0.1"/>
+  <circle cx="1180" cy="120" r="60" fill="white" opacity="0.08"/>
+  <circle cx="200" cy="500" r="30" fill="white" opacity="0.12"/>
+  <circle cx="1100" cy="520" r="45" fill="white" opacity="0.1"/>
+  <circle cx="50" cy="300" r="20" fill="white" opacity="0.15"/>
+  <circle cx="1230" cy="350" r="25" fill="white" opacity="0.12"/>
+
+  <!-- Main Content Card -->
+  <rect x="120" y="80" width="1040" height="480" rx="24" fill="url(#cardGradient)" filter="url(#cardShadow)"/>
+
+  <!-- Logo Section -->
+  <g transform="translate(200, 150)">
+    <!-- Shield Shape -->
+    <path d="M60 0 L45 7 Q40 10 40 15 L40 35 Q40 55 60 70 Q80 55 80 35 L80 15 Q80 10 75 7 Z"
+          fill="url(#logoShieldGradient)" filter="url(#logoShadow)"/>
+
+    <!-- Email Icon -->
+    <rect x="47" y="25" width="26" height="18" rx="2" fill="url(#logoEmailGradient)" stroke="white" stroke-width="1.5"/>
+    <path d="M47 27 L60 35 L73 27" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+    <!-- X Mark (Blocking Symbol) -->
+    <circle cx="70" cy="20" r="8" fill="#FF4757" stroke="white" stroke-width="2"/>
+    <path d="M66 16 L74 24 M74 16 L66 24" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+  </g>
+
+  <!-- Main Title -->
+  <text x="340" y="200" font-family="system-ui, -apple-system, sans-serif" font-size="48" font-weight="700" fill="#2D3748">
+    Disposable Email Domains
+  </text>
+
+  <!-- Subtitle -->
+  <text x="340" y="240" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="400" fill="#4A5568">
+    TypeScript SDK &amp; CLI for Email Validation
+  </text>
+
+  <!-- Features List -->
+  <g transform="translate(340, 280)">
+    <!-- Feature 1 -->
+    <circle cx="8" cy="8" r="4" fill="#48BB78"/>
+    <text x="24" y="13" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="500" fill="#2D3748">
+      79,502+ disposable domains with real-time sync
+    </text>
+
+    <!-- Feature 2 -->
+    <circle cx="8" cy="38" r="4" fill="#4299E1"/>
+    <text x="24" y="43" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="500" fill="#2D3748">
+      Advanced caching, indexing &amp; analytics engine
+    </text>
+
+    <!-- Feature 3 -->
+    <circle cx="8" cy="68" r="4" fill="#9F7AEA"/>
+    <text x="24" y="73" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="500" fill="#2D3748">
+      Multi-source synchronization with intelligent deduplication
+    </text>
+
+    <!-- Feature 4 -->
+    <circle cx="8" cy="98" r="4" fill="#ED8936"/>
+    <text x="24" y="103" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="500" fill="#2D3748">
+      TypeScript-first with comprehensive validation
+    </text>
+  </g>
+
+  <!-- Stats Section -->
+  <g transform="translate(340, 420)">
+    <rect x="0" y="0" width="600" height="60" rx="12" fill="#F7FAFC" stroke="#E2E8F0" stroke-width="1"/>
+
+    <!-- Stat 1 -->
+    <text x="20" y="25" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600" fill="#4A5568">
+      DOMAINS
+    </text>
+    <text x="20" y="42" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="700" fill="#2D3748">
+      79,502
+    </text>
+
+    <!-- Stat 2 -->
+    <text x="140" y="25" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600" fill="#4A5568">
+      SUCCESS RATE
+    </text>
+    <text x="140" y="42" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="700" fill="#48BB78">
+      100.0%
+    </text>
+
+    <!-- Stat 3 -->
+    <text x="280" y="25" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600" fill="#4A5568">
+      SYNC TIME
+    </text>
+    <text x="280" y="42" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="700" fill="#4299E1">
+      1.35s
+    </text>
+
+    <!-- Stat 4 -->
+    <text x="400" y="25" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600" fill="#4A5568">
+      SOURCES
+    </text>
+    <text x="400" y="42" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="700" fill="#9F7AEA">
+      8 Active
+    </text>
+
+    <!-- Stat 5 -->
+    <text x="500" y="25" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600" fill="#4A5568">
+      FILE SIZE
+    </text>
+    <text x="500" y="42" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="700" fill="#ED8936">
+      1.2 MB
+    </text>
+  </g>
+
+  <!-- GitHub Link -->
+  <text x="340" y="520" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="500" fill="#718096" text-decoration="underline">
+    <a href="https://github.com/ali-master/disposable-email-domains" target="_blank" rel="noopener noreferrer">
+      https://github.com/ali-master/disposable-email-domains
+    </a>
+  </text>
+</svg>
+

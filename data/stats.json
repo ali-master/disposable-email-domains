@@ -1,0 +1,70 @@
+{
+  "totalRepositories": 8,
+  "successfulDownloads": 8,
+  "failedDownloads": 0,
+  "totalDomains": 79502,
+  "uniqueDomains": 79502,
+  "duplicates": 57429,
+  "newDomains": 79502,
+  "removedDomains": 0,
+  "processingTime": 1348,
+  "lastSyncTimestamp": "2025-09-24T16:02:44.352Z",
+  "repositoryStats": {
+    "https://github.com/disposable-email-domains/disposable-email-domains": {
+      "url": "https://github.com/disposable-email-domains/disposable-email-domains",
+      "success": true,
+      "domainsCount": 4725,
+      "downloadTime": 591,
+      "fileSize": 61107
+    },
+    "https://github.com/disposable/disposable-email-domains": {
+      "url": "https://github.com/disposable/disposable-email-domains",
+      "success": true,
+      "domainsCount": 27102,
+      "downloadTime": 1016,
+      "fileSize": 391543
+    },
+    "https://github.com/7c/fakefilter": {
+      "url": "https://github.com/7c/fakefilter",
+      "success": true,
+      "domainsCount": 8780,
+      "downloadTime": 772,
+      "fileSize": 129718
+    },
+    "https://github.com/wesbos/burner-email-providers": {
+      "url": "https://github.com/wesbos/burner-email-providers",
+      "success": true,
+      "domainsCount": 27284,
+      "downloadTime": 1039,
+      "fileSize": 397431
+    },
+    "https://github.com/sublime-security/static-files": {
+      "url": "https://github.com/sublime-security/static-files",
+      "success": true,
+      "domainsCount": 10523,
+      "downloadTime": 659,
+      "fileSize": 147442
+    },
+    "https://github.com/FGRibreau/mailchecker": {
+      "url": "https://github.com/FGRibreau/mailchecker",
+      "success": true,
+      "domainsCount": 55857,
+      "downloadTime": 714,
+      "fileSize": 858401
+    },
+    "https://github.com/MattKetmo/EmailChecker": {
+      "url": "https://github.com/MattKetmo/EmailChecker",
+      "success": true,
+      "domainsCount": 2515,
+      "downloadTime": 286,
+      "fileSize": 33184
+    },
+    "https://github.com/willwhite/freemail": {
+      "url": "https://github.com/willwhite/freemail",
+      "success": true,
+      "domainsCount": 4462,
+      "downloadTime": 331,
+      "fileSize": 63316
+    }
+  }
+}

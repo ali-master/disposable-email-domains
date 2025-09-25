@@ -1,0 +1,19 @@
+repositories:
+  - https://github.com/7c/fakefilter
+  - https://github.com/amieiro/disposable-email-domains
+  - https://github.com/Dahoom152/disposable-email
+  - https://github.com/disposable-email-domains/disposable-email-domains
+  - https://github.com/disposable/disposable
+  - https://github.com/eser/sanitizer-svc
+  - https://github.com/FGRibreau/mailchecker
+  - https://github.com/gblmarquez/disposable-email-domains
+  - https://github.com/GeroldSetz/emailondeck.com-domains
+  - https://github.com/groundcat/disposable-email-domain-list
+  - https://github.com/IntegerAlex/disposable-email-detector
+  - https://github.com/jespernissen/disposable-maildomain-list
+  - https://github.com/kslr/disposable-email-domains
+  - https://github.com/MattKetmo/EmailChecker
+  - https://github.com/sublime-security/static-files
+  - https://github.com/unkn0w/disposable-email-domain-list
+  - https://github.com/wesbos/burner-email-providers
+  - https://github.com/willwhite/freemail

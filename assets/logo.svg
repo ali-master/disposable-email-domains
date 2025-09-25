@@ -1,0 +1,44 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="shieldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667EEA;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764BA2;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="emailGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF6B6B;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FF8E53;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="2" dy="2" result="offset"/>
+      <feFlood flood-color="#000" flood-opacity="0.2"/>
+      <feComposite in2="offset" operator="in"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background Circle -->
+  <circle cx="60" cy="60" r="55" fill="white" stroke="#f0f0f0" stroke-width="2"/>
+
+  <!-- Shield Shape -->
+  <path d="M60 15 L45 22 Q40 25 40 30 L40 50 Q40 70 60 85 Q80 70 80 50 L80 30 Q80 25 75 22 Z"
+        fill="url(#shieldGradient)" filter="url(#shadow)"/>
+
+  <!-- Email Icon -->
+  <rect x="47" y="40" width="26" height="18" rx="2" fill="url(#emailGradient)" stroke="white" stroke-width="1.5"/>
+  <path d="M47 42 L60 50 L73 42" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+  <!-- X Mark (Blocking Symbol) -->
+  <circle cx="70" cy="35" r="8" fill="#FF4757" stroke="white" stroke-width="2"/>
+  <path d="M66 31 L74 39 M74 31 L66 39" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Decorative Elements -->
+  <circle cx="25" cy="25" r="2" fill="#667EEA" opacity="0.3"/>
+  <circle cx="95" cy="30" r="1.5" fill="#764BA2" opacity="0.4"/>
+  <circle cx="20" cy="90" r="1" fill="#FF6B6B" opacity="0.5"/>
+  <circle cx="90" cy="95" r="2.5" fill="#FF8E53" opacity="0.3"/>
+</svg>
+

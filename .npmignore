@@ -1,0 +1,22 @@
+# source
+src
+package-lock.json
+bun.lock
+tslint.json
+tsconfig.json
+.prettierrc
+
+# misc
+.commitlintrc.json
+.release-it.json
+.eslintignore
+.eslintrc.js
+
+.idea
+.vscode
+# test
+jest.config.js
+# coverage
+coverage
+# docs
+docs
