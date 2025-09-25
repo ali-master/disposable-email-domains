@@ -3,7 +3,7 @@
 <div align="center">
   <img src="assets/logo.svg" alt="Disposable Email Domains Logo" width="120" height="120">
   
-  <p><strong>A powerful TypeScript SDK and CLI for detecting disposable email addresses with real-time synchronization and DNS validation</strong></p>
+  <p><strong>A powerful TypeScript SDK for detecting disposable email addresses with real-time synchronization and DNS validation</strong></p>
   
   [![npm version](https://badge.fury.io/js/%40usex%2Fdisposable-email-domains.svg)](https://www.npmjs.com/package/@usex/disposable-email-domains)
   [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://www.typescriptlang.org/)
