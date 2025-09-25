@@ -1,8 +1,5 @@
 import type { EmailValidationResult } from "./types";
-import { promisify } from "util";
-import { resolve } from "dns";
-
-const resolveMx = promisify(resolve);
+import { DnsResolver, type DnsResolverConfig, type DnsValidationResult } from "./dns-resolver";
 
 // Pre-compiled patterns for better performance
 const EMAIL_REGEX =
@@ -23,20 +20,17 @@ const SUSPICIOUS_PATTERNS = Object.freeze([
 
 const SUSPICIOUS_DOMAIN_PATTERNS = Object.freeze([/-temp-/, /-fake-/, /temp\d+/, /\d{5,}/]);
 
-// Cache for MX record lookups
-const mxCache = new Map<string, boolean>();
-const MX_CACHE_TTL = 300000; // 5 minutes
-const mxCacheTimestamps = new Map<string, number>();
-
 /**
- * Email validator for format validation and parsing
+ * Email validator for format validation and parsing with DNS validation
  */
 export class EmailValidator {
   private strictValidation: boolean;
   private compiledCustomPatterns: RegExp[] = [];
+  private dnsResolver: DnsResolver;
 
-  constructor(strictValidation = false) {
+  constructor(strictValidation = false, dnsConfig?: Partial<DnsResolverConfig>) {
     this.strictValidation = strictValidation;
+    this.dnsResolver = new DnsResolver(dnsConfig);
   }
 
   /**
@@ -172,92 +166,31 @@ export class EmailValidator {
   }
 
   /**
-   * Check MX record with caching
+   *  MX record validation with detailed results
    */
-  async checkMxRecord(domain: string): Promise<boolean> {
-    const now = Date.now();
-
-    // Check cache first
-    const cached = mxCache.get(domain);
-    const timestamp = mxCacheTimestamps.get(domain);
-
-    if (cached !== undefined && timestamp && now - timestamp < MX_CACHE_TTL) {
-      return cached;
-    }
-
-    try {
-      const records = await resolveMx(domain);
-      const hasMx = records && records.length > 0;
-
-      // Cache the result
-      mxCache.set(domain, hasMx);
-      mxCacheTimestamps.set(domain, now);
-
-      // Cleanup old cache entries periodically
-      if (mxCache.size > 10000) {
-        this.cleanupMxCache();
-      }
-
-      return hasMx;
-    } catch (error) {
-      // Cache negative results for shorter time
-      mxCache.set(domain, false);
-      mxCacheTimestamps.set(domain, now);
-      return false;
-    }
+  async validateMxRecord(domain: string): Promise<DnsValidationResult> {
+    return this.dnsResolver.validateMxRecord(domain);
   }
 
   /**
-   * Batch MX record checking
+   * Batch MX record validation
    */
-  async checkMxRecordsBatch(domains: string[]): Promise<Map<string, boolean>> {
-    const results = new Map<string, boolean>();
-    const uncachedDomains: string[] = [];
-    const now = Date.now();
-
-    // Check cache first
-    for (const domain of domains) {
-      const cached = mxCache.get(domain);
-      const timestamp = mxCacheTimestamps.get(domain);
-
-      if (cached !== undefined && timestamp && now - timestamp < MX_CACHE_TTL) {
-        results.set(domain, cached);
-      } else {
-        uncachedDomains.push(domain);
-      }
-    }
-
-    // Check uncached domains with concurrency limit
-    if (uncachedDomains.length > 0) {
-      const BATCH_SIZE = 10;
-      for (let i = 0; i < uncachedDomains.length; i += BATCH_SIZE) {
-        const batch = uncachedDomains.slice(i, i + BATCH_SIZE);
-        const promises = batch.map((domain) => this.checkMxRecord(domain));
-        const batchResults = await Promise.all(promises);
-
-        for (let j = 0; j < batch.length; j++) {
-          results.set(batch[j], batchResults[j]);
-        }
-      }
-    }
-
-    return results;
+  async validateMxRecordsBatch(domains: string[]): Promise<Map<string, DnsValidationResult>> {
+    return this.dnsResolver.validateMxRecordsBatch(domains);
   }
 
-  private cleanupMxCache(): void {
-    const now = Date.now();
-    const entriesToDelete: string[] = [];
+  /**
+   * Simple MX record check (backward compatibility)
+   */
+  async checkMxRecord(domain: string): Promise<boolean> {
+    return this.dnsResolver.checkMxRecord(domain);
+  }
 
-    for (const [domain, timestamp] of mxCacheTimestamps) {
-      if (now - timestamp > MX_CACHE_TTL) {
-        entriesToDelete.push(domain);
-      }
-    }
-
-    for (const domain of entriesToDelete) {
-      mxCache.delete(domain);
-      mxCacheTimestamps.delete(domain);
-    }
+  /**
+   * Batch simple MX record checking
+   */
+  async checkMxRecordsBatch(domains: string[]): Promise<Map<string, boolean>> {
+    return this.dnsResolver.checkMxRecordsBatch(domains);
   }
 
   /**
@@ -268,20 +201,32 @@ export class EmailValidator {
   }
 
   /**
-   * Get validation statistics
+   * Update DNS resolver configuration
    */
-  getStats(): { mxCacheSize: number; mxCacheHitRate: number } {
+  updateDnsConfig(newConfig: Partial<DnsResolverConfig>): void {
+    this.dnsResolver.updateConfig(newConfig);
+  }
+
+  /**
+   * Get validation statistics including DNS stats
+   */
+  getStats(): {
+    dnsStats: {
+      cacheSize: number;
+      activeRequests: number;
+      queuedRequests: number;
+      cacheHitRate: number;
+    };
+  } {
     return {
-      mxCacheSize: mxCache.size,
-      mxCacheHitRate: mxCache.size > 0 ? mxCache.size / (mxCache.size + mxCacheTimestamps.size) : 0,
+      dnsStats: this.dnsResolver.getStats(),
     };
   }
 
   /**
-   * Clear MX cache
+   * Clear DNS cache
    */
-  clearMxCache(): void {
-    mxCache.clear();
-    mxCacheTimestamps.clear();
+  clearDnsCache(): void {
+    this.dnsResolver.clearCache();
   }
 }

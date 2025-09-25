@@ -18,8 +18,10 @@ import {
 export async function basicEmailValidation() {
   console.log("🚀 Basic Email Validation Example\n");
 
-  // Create checker with default configuration
-  const checker = new DisposableEmailChecker();
+  // Create checker with DNS validation enabled
+  const checker = new DisposableEmailChecker({
+    checkMxRecord: true,
+  });
 
   // Test various email addresses
   const testEmails = [
@@ -38,6 +40,22 @@ export async function basicEmailValidation() {
     console.log(`   🗑️ Disposable: ${result.isDisposable}`);
     console.log(`   🎯 Confidence: ${result.confidence}%`);
     console.log(`   ⚡ Time: ${result.validationTime.toFixed(2)}ms`);
+
+    // Display DNS validation results if available
+    if (result.dnsValidation) {
+      console.log(`   🌐 DNS Validation:`);
+      console.log(`      📬 Has MX: ${result.dnsValidation.hasMx}`);
+      if (result.dnsValidation.mxRecords.length > 0) {
+        console.log(`      📋 MX Records: ${result.dnsValidation.mxRecords.length} found`);
+        result.dnsValidation.mxRecords.forEach((mx, index) => {
+          console.log(`         ${index + 1}. ${mx.exchange} (priority: ${mx.priority})`);
+        });
+      }
+      console.log(`      🛡️ SPF Record: ${result.dnsValidation.hasSpf}`);
+      console.log(`      🔒 DMARC Policy: ${result.dnsValidation.hasDmarc}`);
+      console.log(`      🔌 SMTP Connectable: ${result.dnsValidation.isConnectable}`);
+      console.log(`      ⏱️ DNS Time: ${result.dnsValidation.dnsValidationTime.toFixed(2)}ms`);
+    }
 
     if (result.errors.length > 0) {
       console.log(`   ❌ Errors: ${result.errors.join(", ")}`);

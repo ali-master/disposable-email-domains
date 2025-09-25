@@ -2,12 +2,7 @@ import { afterEach, beforeEach, bench, describe } from "vitest";
 import { randomUUID } from "crypto";
 import { DisposableEmailChecker } from "../src/client";
 
-/**
- * Fixed indexing and searching performance benchmarks
- * Focus on different indexing strategies and search patterns with proper error handling
- */
-
-// Enhanced email generation with realistic patterns
+// email generation with realistic patterns
 function generateRandomEmails(count: number): string[] {
   const domains = [
     "mailinator.com",

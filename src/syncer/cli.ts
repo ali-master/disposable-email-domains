@@ -211,7 +211,7 @@ class CLI {
       });
     }
 
-    // Enhanced failed downloads section
+    // failed downloads section
     if (stats.failedDownloads > 0) {
       console.log(`\n⚠️  ${stats.failedDownloads} repositories failed to download`);
 

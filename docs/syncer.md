@@ -1,6 +1,6 @@
 # Domain Synchronization Manager Documentation
 
-The Domain Synchronization Manager is a powerful component of the Disposable Email Domains SDK that handles downloading, processing, and synchronizing disposable email domain lists from multiple trusted sources with intelligent deduplication and comprehensive statistics.
+The Domain Synchronization Manager is a powerful component of the Disposable Email Domains SDK that handles downloading, processing, and synchronizing disposable email domain lists from multiple trusted sources with intelligent deduplication and statistics.
 
 ## 📋 Table of Contents
 
@@ -22,7 +22,7 @@ The syncer provides:
 - **Multi-source synchronization** from Git repositories, direct URLs, and local files
 - **Intelligent deduplication** with source tracking and conflict resolution
 - **Concurrent processing** with configurable concurrency limits
-- **Comprehensive statistics** including performance metrics and domain analysis
+- **statistics** including performance metrics and domain analysis
 - **Backup and versioning** support for data integrity
 - **Error handling and retry** mechanisms for robust operation
 
@@ -177,7 +177,7 @@ interface Repository {
 ```typescript
 interface SyncResult {
   domains: Set<string>;        // All unique domains found
-  stats: SyncStats;           // Comprehensive statistics
+  stats: SyncStats;           //  statistics
   errors: Error[];            // Any errors encountered
 }
 ```
@@ -487,7 +487,7 @@ class MemoryOptimizedSyncManager extends DisposableEmailSyncManager {
 
 ## 🚨 Error Handling
 
-### Comprehensive Error Handling
+###  Error Handling
 
 ```typescript
 class RobustSyncManager extends DisposableEmailSyncManager {

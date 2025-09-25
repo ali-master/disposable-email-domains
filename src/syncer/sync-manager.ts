@@ -10,13 +10,13 @@ import type {
 } from "./types";
 
 /**
- * DisposableEmailSyncManager - A comprehensive manager for downloading and synchronizing
+ * DisposableEmailSyncManager - A manager for downloading and synchronizing
  * disposable email domains from multiple sources with detailed statistics and deduplication.
  *
  * Features:
  * - Multi-source downloading with concurrency control
  * - Intelligent deduplication with source tracking
- * - Comprehensive statistics generation
+ * -  statistics generation
  * - Backup and versioning support
  * - Error handling and retry mechanisms
  */
@@ -305,7 +305,7 @@ export class DisposableEmailSyncManager {
   }
 
   /**
-   * Validates domain format using comprehensive regex
+   * Validates domain format using regex
    */
   private isValidDomain(domain: string): boolean {
     if (!domain || domain.length > 253) return false;
@@ -437,7 +437,7 @@ export class DisposableEmailSyncManager {
   }
 
   /**
-   * Generates comprehensive statistics file
+   * Generates statistics file
    */
   private async generateStatistics(stats: SyncStats): Promise<void> {
     const statisticsData = {

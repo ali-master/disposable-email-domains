@@ -77,6 +77,11 @@ export class MemoryCache implements IEventDrivenCache {
     if (this.cache.size >= this.maxSize) {
       // Remove oldest entry (LRU eviction)
       const oldestKey = this.cache.keys().next().value;
+      if (!oldestKey) {
+        debug("No oldest key found for eviction");
+        return;
+      }
+
       this.cache.delete(oldestKey);
       debug("LRU eviction: removed key %s", oldestKey);
     }

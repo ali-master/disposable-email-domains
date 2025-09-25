@@ -23,6 +23,11 @@ export type {
   CacheEventType,
 } from "./cache-factory";
 
+// Export DNS resolver types and classes
+export type { DnsResolverConfig, MxRecord, DnsValidationResult, DnsCache } from "./dns-resolver";
+
+export { DnsResolver } from "./dns-resolver";
+
 // Export main classes
 export { DisposableEmailChecker } from "./disposable-email-checker";
 
@@ -95,3 +100,36 @@ export const createEmailCheckerWithCache = (
  * Default export for the main class
  */
 export default DisposableEmailChecker;
+
+/**
+ * Quick email validation function
+ */
+export async function checkEmail(
+  email: string,
+  config?: Partial<EmailCheckerConfig>,
+): Promise<EmailValidationResult> {
+  const checker = new DisposableEmailChecker(config);
+  return checker.checkEmail(email);
+}
+
+/**
+ * Quick batch email validation function
+ */
+export async function checkEmailsBatch(
+  emails: string[],
+  config?: Partial<EmailCheckerConfig>,
+): Promise<EmailValidationResult[]> {
+  const checker = new DisposableEmailChecker(config);
+  return checker.checkEmailsBatch(emails);
+}
+
+/**
+ * Quick domain validation function with DNS checking
+ */
+export async function validateDomain(
+  domain: string,
+  config?: Partial<EmailCheckerConfig>,
+): Promise<import("./dns-resolver").DnsValidationResult> {
+  const checker = new DisposableEmailChecker(config);
+  return checker.validateDomain(domain);
+}

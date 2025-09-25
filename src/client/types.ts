@@ -19,6 +19,15 @@ export interface EmailValidationResult {
   validationTime: number; // milliseconds
   errors: string[];
   warnings: string[];
+  // DNS validation results (optional)
+  dnsValidation?: {
+    hasMx: boolean;
+    mxRecords: Array<{ exchange: string; priority: number }>;
+    hasSpf: boolean;
+    hasDmarc: boolean;
+    isConnectable: boolean;
+    dnsValidationTime: number;
+  };
 }
 
 /**
@@ -36,6 +45,10 @@ export interface PerformanceMetrics {
   indexSize: number;
   lastUpdated: string;
   throughputPerSecond: number;
+  // DNS metrics
+  dnsValidations?: number;
+  dnsSuccessRate?: number;
+  averageDnsTime?: number;
 }
 
 /**
@@ -53,6 +66,21 @@ export interface EmailCheckerConfig {
   checkMxRecord?: boolean;
   enableSubdomainChecking?: boolean;
   enablePatternMatching?: boolean;
+
+  // Advanced DNS validation options
+  dnsValidation?: {
+    timeout?: number;
+    retries?: number;
+    enableCaching?: boolean;
+    cacheSize?: number;
+    cacheTtl?: number;
+    concurrency?: number;
+    validateMxConnectivity?: boolean;
+    checkSpfRecord?: boolean;
+    checkDmarcRecord?: boolean;
+    customDnsServers?: string[];
+    fallbackDnsServers?: string[];
+  };
 
   // Performance options
   enableCaching?: boolean;

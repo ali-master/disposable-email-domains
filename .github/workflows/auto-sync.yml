@@ -365,7 +365,7 @@ jobs:
 
       - name: 🧪 Run Tests
         run: |
-          echo "🧪 Running comprehensive test suite..."
+          echo "🧪 Running test suite..."
           bun test --coverage --reporter=verbose
 
       - name: 🔍 Validate Domain Format

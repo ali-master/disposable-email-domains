@@ -67,7 +67,7 @@ const returnToPool = (result: EmailValidationResult): void => {
 };
 
 /**
- * Advanced Email Disposable Checker with comprehensive features
+ * Advanced Email Disposable Checker with features
  */
 export class DisposableEmailChecker {
   private config: Required<EmailCheckerConfig>;
@@ -115,6 +115,19 @@ export class DisposableEmailChecker {
       indexingStrategy: "hybrid",
       autoUpdate: false,
       updateInterval: 24,
+      // Advanced DNS validation defaults
+      dnsValidation: {
+        timeout: 5000,
+        retries: 3,
+        enableCaching: true,
+        cacheSize: 5000,
+        cacheTtl: 300000, // 5 minutes
+        concurrency: 10,
+        validateMxConnectivity: false,
+        checkSpfRecord: false,
+        checkDmarcRecord: false,
+        fallbackDnsServers: ["8.8.8.8", "1.1.1.1", "208.67.222.222"],
+      },
       // @ts-expect-error
       customPatterns: DisposableEmailChecker.EMPTY_PATTERNS,
       // @ts-expect-error
@@ -136,7 +149,11 @@ export class DisposableEmailChecker {
     this.initializeCacheManager();
     this.metricsManager = new MetricsManager();
     this.dataLoader = new DataLoader();
-    this.emailValidator = new EmailValidator(this.config.strictValidation);
+    // Initialize EmailValidator with DNS configuration
+    this.emailValidator = new EmailValidator(
+      this.config.strictValidation,
+      this.config.dnsValidation,
+    );
 
     // Initialize domain checker with empty sets (will be updated after data loading)
     this.domainChecker = new DomainChecker(
@@ -364,7 +381,7 @@ export class DisposableEmailChecker {
   }
 
   /**
-   * Perform comprehensive email validation and checking
+   * Perform email validation and checking
    */
   private async performEmailCheck(
     email: string,
@@ -431,16 +448,49 @@ export class DisposableEmailChecker {
       }
     }
 
-    // Step 7: MX record validation (if enabled)
+    // Step 7: DNS record validation (or simple)
     if (this.config.checkMxRecord) {
       try {
-        const hasMx = await this.emailValidator.checkMxRecord(domain);
-        if (!hasMx) {
-          result.warnings.push("No MX record found for domain");
-          result.confidence = Math.max(result.confidence, 60);
+        // Check if DNS validation is enabled
+        const dnsConfig = this.config.dnsValidation;
+        const needsValidation =
+          dnsConfig?.validateMxConnectivity ||
+          dnsConfig?.checkSpfRecord ||
+          dnsConfig?.checkDmarcRecord;
+
+        if (needsValidation) {
+          //  DNS validation
+          const dnsResult = await this.emailValidator.validateMxRecord(domain);
+          result.dnsValidation = {
+            hasMx: dnsResult.hasMx,
+            mxRecords: dnsResult.mxRecords,
+            hasSpf: dnsResult.hasSpf,
+            hasDmarc: dnsResult.hasDmarc,
+            isConnectable: dnsResult.isConnectable,
+            dnsValidationTime: dnsResult.validationTime,
+          };
+
+          if (!dnsResult.hasMx) {
+            result.warnings.push("No MX record found for domain");
+            result.confidence = Math.max(result.confidence, 60);
+          }
+
+          // Add additional warnings based on DNS validation
+          result.warnings.push(...dnsResult.warnings);
+
+          if (dnsResult.errors.length > 0) {
+            result.warnings.push("DNS validation encountered errors");
+          }
+        } else {
+          // Simple MX record check (backward compatibility)
+          const hasMx = await this.emailValidator.checkMxRecord(domain);
+          if (!hasMx) {
+            result.warnings.push("No MX record found for domain");
+            result.confidence = Math.max(result.confidence, 60);
+          }
         }
       } catch (error) {
-        result.warnings.push("Failed to check MX record");
+        result.warnings.push("Failed to check DNS records");
       }
     }
 
@@ -657,5 +707,60 @@ export class DisposableEmailChecker {
    */
   public getConfig(): Required<EmailCheckerConfig> {
     return { ...this.config };
+  }
+
+  /**
+   *  DNS validation for a domain
+   */
+  public async validateDomain(
+    domain: string,
+  ): Promise<import("./dns-resolver").DnsValidationResult> {
+    await this.ensureInitialized();
+    return this.emailValidator.validateMxRecord(domain);
+  }
+
+  /**
+   * Batch DNS validation for multiple domains
+   */
+  public async validateDomainsBatch(
+    domains: string[],
+  ): Promise<Map<string, import("./dns-resolver").DnsValidationResult>> {
+    await this.ensureInitialized();
+    return this.emailValidator.validateMxRecordsBatch(domains);
+  }
+
+  /**
+   * Update DNS resolver configuration
+   */
+  public updateDnsConfig(newConfig: Partial<import("./dns-resolver").DnsResolverConfig>): void {
+    this.emailValidator.updateDnsConfig(newConfig);
+    debug("DNS configuration updated");
+  }
+
+  /**
+   * Get statistics including DNS performance
+   */
+  public getStats(): {
+    performance: PerformanceMetrics;
+    cache: Promise<CacheStats>;
+    dns: ReturnType<EmailValidator["getStats"]>["dnsStats"];
+    domains: ReturnType<DomainChecker["getDomainCounts"]>;
+  } {
+    return {
+      performance: this.getMetrics(),
+      cache: this.getCacheStats(),
+      dns: this.emailValidator.getStats().dnsStats,
+      domains: this.domainChecker.getDomainCounts(),
+    };
+  }
+
+  /**
+   * Clear all caches (email validation and DNS)
+   */
+  public async clearAllCaches(): Promise<void> {
+    await this.clearCache();
+    this.emailValidator.clearDnsCache();
+    this.domainChecker.clearCache();
+    debug("All caches cleared");
   }
 }

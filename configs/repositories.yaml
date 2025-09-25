@@ -8,7 +8,7 @@ repositories:
     type: "git"
     blocklist_files:
       - "/refs/heads/main/disposable_email_blocklist.conf"
-    description: "The most comprehensive and actively maintained disposable email domains database"
+    description: "The most and actively maintained disposable email domains database"
     priority: 1
 
   - name: "Disposable Domains - Community Maintained"
@@ -56,7 +56,7 @@ repositories:
     type: "git"
     blocklist_files:
       - "/refs/heads/master/disposable-maildomain-list.txt"
-    description: "Danish-originated comprehensive disposable mail domain collection"
+    description: "Danish-originated disposable mail domain collection"
     priority: 4
 
   - name: "KSLR Disposable Email Database"
@@ -112,7 +112,7 @@ repositories:
     type: "git"
     blocklist_files:
       - "/refs/heads/master/data/free.txt"
-    description: "Comprehensive free email providers list including disposable services"
+    description: "free email providers list including disposable services"
     priority: 7
 
   - name: "Sublime Security Threat Intelligence"
@@ -145,5 +145,5 @@ metadata:
   version: "1.2.0"
   last_updated: "2025-09-24"
   total_sources: 15
-  description: "Comprehensive disposable email domains configuration with prioritized sources"
+  description: "disposable email domains configuration with prioritized sources"
   maintainer: "Ali Torki <ali_4286@live.com>"
