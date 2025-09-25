@@ -75,7 +75,7 @@
 
   <!-- Subtitle -->
   <text x="340" y="240" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="400" fill="#4A5568">
-    TypeScript SDK &amp; CLI for Email Validation
+    TypeScript SDK for Email Validation
   </text>
 
   <!-- Features List -->
