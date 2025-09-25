@@ -513,6 +513,11 @@ jobs:
             const hasChanges = '${{ needs.commit_changes.outputs.has_changes }}' === 'true';
             const triggerType = '${{ needs.validate_trigger.outputs.trigger_type }}';
             const syncType = '${{ needs.validate_trigger.outputs.sync_type }}';
+            const domainsCount = '${{ needs.manual_sync.outputs.domains_count }}';
+            const newDomains = '${{ needs.manual_sync.outputs.new_domains }}';
+            const removedDomains = '${{ needs.manual_sync.outputs.removed_domains }}';
+            const successRate = '${{ needs.manual_sync.outputs.success_rate }}';
+            const processingTime = '${{ needs.manual_sync.outputs.processing_time }}';
             
             let summary = '## 🔧 Manual Sync & Maintenance Summary\n\n';
             
@@ -525,11 +530,11 @@ jobs:
             
             if (syncSuccess) {
               summary += '### 📈 Sync Results\n';
-              summary += `- **Total Domains**: ${{ needs.manual_sync.outputs.domains_count }}\n`;
-              summary += `- **New Domains**: ${{ needs.manual_sync.outputs.new_domains }}\n`;
-              summary += `- **Removed Domains**: ${{ needs.manual_sync.outputs.removed_domains }}\n`;
-              summary += `- **Success Rate**: ${{ needs.manual_sync.outputs.success_rate }}%\n`;
-              summary += `- **Processing Time**: ${{ needs.manual_sync.outputs.processing_time }}ms\n\n`;
+              summary += `- **Total Domains**: ${domainsCount}\n`;
+              summary += `- **New Domains**: ${newDomains}\n`;
+              summary += `- **Removed Domains**: ${removedDomains}\n`;
+              summary += `- **Success Rate**: ${successRate}%\n`;
+              summary += `- **Processing Time**: ${processingTime}ms\n\n`;
             }
             
             if ('${{ needs.manual_sync.outputs.report_path }}') {
@@ -551,5 +556,5 @@ jobs:
             console.log(`⚙️ Sync Type: ${syncType.toUpperCase()}`);
             
             if (syncSuccess) {
-              console.log(`📊 Results: ${needs.manual_sync.outputs.domains_count} domains (+${{ needs.manual_sync.outputs.new_domains }}, -${{ needs.manual_sync.outputs.removed_domains }})`);
+              console.log(`📊 Results: ${domainsCount} domains (+${newDomains}, -${removedDomains})`);
             }
