@@ -83,7 +83,7 @@
     <!-- Feature 1 -->
     <circle cx="8" cy="8" r="4" fill="#48BB78"/>
     <text x="24" y="13" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="500" fill="#2D3748">
-      79,502+ disposable domains with real-time sync
+      119,000+ disposable domains with real-time sync
     </text>
 
     <!-- Feature 2 -->
@@ -114,7 +114,7 @@
       DOMAINS
     </text>
     <text x="20" y="42" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="700" fill="#2D3748">
-      79,502
+        119,000
     </text>
 
     <!-- Stat 2 -->
@@ -130,7 +130,7 @@
       SYNC TIME
     </text>
     <text x="280" y="42" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="700" fill="#4299E1">
-      1.35s
+      0.8s
     </text>
 
     <!-- Stat 4 -->
@@ -138,7 +138,7 @@
       SOURCES
     </text>
     <text x="400" y="42" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="700" fill="#9F7AEA">
-      8 Active
+      15 Active
     </text>
 
     <!-- Stat 5 -->
@@ -146,7 +146,7 @@
       FILE SIZE
     </text>
     <text x="500" y="42" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="700" fill="#ED8936">
-      1.2 MB
+      1.9 MB
     </text>
   </g>
 
