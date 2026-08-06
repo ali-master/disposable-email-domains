@@ -97,14 +97,12 @@
     "test:debug": "vitest --inspect-brk --pool forks --poolOptions.forks.singleFork",
     "test:debug:watch": "bun run test:debug --watch --poolOptions.threads.isolate false",
     "format": "prettier --write \"**/*.ts\"",
-    "prepare": "bun run build",
     "prepublish:next": "bun run build",
     "publish:next": "bun publish --access public --tag next",
     "prepublish:npm": "bun run build",
     "publish:npm": "bun publish --access public",
     "prerelease": "bun run build",
-    "release": "release-it",
-    "preinstall": "bunx is-ci || bunx only-allow bun"
+    "release": "release-it"
   },
   "dependencies": {},
   "devDependencies": {
